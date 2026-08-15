@@ -24,12 +24,14 @@ import de.hxp.hxpaddons.utils.render.drawText
 import de.hxp.hxpaddons.utils.render.drawWireFrameBox
 import de.hxp.hxpaddons.utils.renderBoundingBox
 import de.hxp.hxpaddons.utils.texture
+import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
@@ -113,17 +115,21 @@ import kotlin.math.max
  * [ignoreArmorStandVisual] (on by default) before ever reaching the render pass, making the match look like
  * it never fired.
  *
- * Head Texture match mode (2026-08-16, on request - "kann man die auch irgendwie scannen", after explaining
+ * Custom Texture match mode (2026-08-16, on request - "kann man die auch irgendwie scannen", after explaining
  * how Hypixel commonly disguises a mob/NPC with a player-head item carrying a custom skin instead of a
- * readable name, e.g. Odonata-style hidden mobs): matches an entity's equipped `HEAD` slot item's raw skin
- * texture value (see [de.hxp.hxpaddons.utils.texture], already existing in this codebase for reading a
- * skull's custom skin off its `DataComponents.PROFILE` component) - the same identical-per-skin base64 string
- * every time that exact disguise is worn, so it's just as reliable a match key as a name, and (per the same
- * explanation) equipment data isn't necessarily gated behind the same close-range requirement Hypixel applies
- * to some nametags. Since the raw value is long, unreadable, and impossible to copy out of rendered 3D world
- * text, [debugLabelFor] substitutes a short "Texture #N" id for the floating label and chat-dumps the full
- * value the first time each distinct one is seen, so the actual copy/paste-into-Entity-Names step happens via
- * chat instead.
+ * readable name, e.g. Odonata-style hidden mobs). Originally just the equipped `HEAD` slot's skull skin
+ * texture (see [de.hxp.hxpaddons.utils.texture]) - broadened the same day after live testing against Odonata
+ * specifically showed "no head texture" even though it visibly renders as something other than particles,
+ * meaning it isn't a skull-in-the-HEAD-slot disguise at all. [disguiseSignals] now checks every equipped slot
+ * (not just HEAD) for any of three possible signal types: skull skin texture, `CustomModelData` strings, or
+ * an `ItemModel` identifier - whichever mechanism Hypixel actually used, without needing to already know
+ * which one in advance. Any matched value is just as reliable a match key as a name (identical every time
+ * that exact disguise is worn), and equipment data isn't necessarily gated behind the same close-range
+ * requirement Hypixel applies to some nametags. Since the combined value can be long/unreadable and is
+ * impossible to copy out of rendered 3D world text, [debugLabelFor] substitutes a short "Texture #N" id for
+ * the floating label and chat-dumps a full per-slot breakdown (item id + every signal found, or "no signal"
+ * if an equipped item's disguise mechanism still isn't one of the three recognized types) the first time each
+ * distinct combination is seen, so the actual copy/paste-into-Entity-Names step happens via chat instead.
  *
  * Entirely unverified live - first time this exact matching+labeling combination gets exercised.
  */
@@ -133,12 +139,12 @@ object CustomESP : Module(
     category = Category.RENDER
 ) {
     private val matchMode by SelectorSetting(
-        "Match Mode", "Entity Type", listOf("Entity Type", "Name Tag", "Head Texture"),
-        desc = "Whether the Entity Names list is matched against each entity's Minecraft type (e.g. \"Zombie\"), its current display name/nametag, or its equipped head item's raw skin texture value (for entities disguised via a custom-skin player head, e.g. a hidden mob or NPC with no readable name)."
+        "Match Mode", "Entity Type", listOf("Entity Type", "Name Tag", "Custom Texture"),
+        desc = "Whether the Entity Names list is matched against each entity's Minecraft type (e.g. \"Zombie\"), its current display name/nametag, or any visual disguise signal (skull skin texture, resource-pack model id) found across all of its equipped items - for entities disguised via a custom item instead of a readable name, e.g. hidden mobs/NPCs."
     )
     private val entityNames by StringSetting(
         "Entity Names", "", length = 256,
-        desc = "Comma-separated list to match (e.g. \"Zombie, Skeleton\", or a raw texture value in Head Texture mode) - matched as a case-insensitive substring against whichever Match Mode picks. Leave empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called, or which texture id it has in Head Texture mode."
+        desc = "Comma-separated list to match (e.g. \"Zombie, Skeleton\", or a raw value from the Custom Texture debug dump) - matched as a case-insensitive substring against whichever Match Mode picks. Leave empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called, or which texture/model id it carries in Custom Texture mode."
     )
     private val ignoreEntityNames by StringSetting(
         "Ignore Entity Names", "", length = 256,
@@ -359,36 +365,74 @@ object CustomESP : Module(
     }
 
     /**
-     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], its equipped head item's raw skin texture
-     * value in [MATCH_MODE_TEXTURE] (empty string if it has no head item, or isn't a [LivingEntity] at all -
-     * matches nothing, same as any other blank search term would), its current display name/nametag
-     * otherwise - this is the value actually compared against [entityNames]/[ignoreEntityNames]. For the
-     * debug-mode floating label specifically, see [debugLabelFor] instead - a raw base64 texture value is
-     * both unreadable and impossible to copy back out of 3D world text, so that path substitutes a short id.
+     * Every readable "custom disguise" signal a single equipped item carries - its skull skin texture value
+     * (see [de.hxp.hxpaddons.utils.texture]), each non-blank [net.minecraft.world.item.component.CustomModelData]
+     * string, and its [net.minecraft.world.item.component.DataComponents.ITEM_MODEL] identifier if set. A
+     * disguise doesn't have to be a custom-skin skull - Odonata turned out to have none (2026-08-16, reported
+     * live: "no head texture obwohl sie als entity ein armorstand sind und es visuell was zu sehen gibt was
+     * nicht partikel sind"), meaning whatever gives it its visible model is a different item/slot/mechanism
+     * entirely - most likely a plain item with a resource-pack-remapped model via `CustomModelData`/
+     * `ItemModel` instead of a skull skin. Scanning every possible signal type (not just skull textures) and
+     * every equipped slot (not just [EquipmentSlot.HEAD], see [labelFor]) means whichever mechanism is
+     * actually behind it still gets picked up, without needing to already know which one it is in advance.
+     */
+    private fun ItemStack.disguiseSignals(): List<String> {
+        if (isEmpty) return emptyList()
+        val signals = mutableListOf<String>()
+        texture?.let { signals.add(it) }
+        get(DataComponents.CUSTOM_MODEL_DATA)?.strings()?.forEach { if (it.isNotBlank()) signals.add(it) }
+        get(DataComponents.ITEM_MODEL)?.let { signals.add(it.toString()) }
+        return signals
+    }
+
+    /**
+     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], every [disguiseSignals] value found across
+     * ALL of its equipped slots (not just [EquipmentSlot.HEAD] - see that function's own doc for why) joined
+     * together in [MATCH_MODE_TEXTURE] (empty string if it's not a [LivingEntity], or has no equipped item
+     * carrying any signal at all - matches nothing, same as any other blank search term would), its current
+     * display name/nametag otherwise - this is the value actually compared against
+     * [entityNames]/[ignoreEntityNames]. For the debug-mode floating label specifically, see [debugLabelFor]
+     * instead - the raw joined value can be long/unreadable and impossible to copy back out of 3D world text.
      */
     private fun labelFor(entity: Entity): String = when (matchMode) {
         MATCH_MODE_TYPE -> entity.type.description.string
-        MATCH_MODE_TEXTURE -> (entity as? LivingEntity)?.getItemBySlot(EquipmentSlot.HEAD)?.texture.orEmpty()
+        MATCH_MODE_TEXTURE -> (entity as? LivingEntity)
+            ?.let { living -> EquipmentSlot.entries.flatMap { living.getItemBySlot(it).disguiseSignals() } }
+            ?.joinToString("|").orEmpty()
         else -> entity.name.string.noControlCodes
     }
 
     /**
      * The text drawn above an entity in debug mode (see [debugShowNames]) - identical to [labelFor] except in
-     * [MATCH_MODE_TEXTURE], where the real value is a long base64 string that's both unreadable as floating
-     * world text and impossible to copy back out of the game world at all. Instead, each distinct texture
-     * value seen gets a short sequential id ("Texture #1", "Texture #2", ...) - both drawn in-world (readable
-     * from a distance) and printed once to chat together with the FULL raw value the first time it's seen
-     * (copyable from there) via [discoveredTextures], so the workflow is: turn on debug mode with Head
+     * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
+     * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
+     * "Texture #2", ...) - both drawn in-world (readable from a distance) and printed once to chat, together
+     * with a full per-slot breakdown (item id + every raw signal found in that slot) the first time it's seen
+     * (copyable from there) via [discoveredTextures] - so the workflow is: turn on debug mode with Custom
      * Texture selected, look at whatever should be highlighted, read the matching "Texture #N" off its
-     * floating label, then find that same id in chat and copy the full value into Entity Names.
+     * floating label, then find that same id in chat for the exact per-slot details to match on. If an entity
+     * has equipped items but none carry any recognized signal, the per-slot item ids are still dumped (rather
+     * than just "nothing found") so it's visible *what's equipped* even when this function doesn't yet know
+     * how to read its disguise mechanism.
      */
     private fun debugLabelFor(entity: Entity): String {
         if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
-        val texture = labelFor(entity)
-        if (texture.isBlank()) return "(no head texture)"
-        val index = discoveredTextures.getOrPut(texture) {
+        val living = entity as? LivingEntity ?: return "(not a living entity)"
+        val equipped = EquipmentSlot.entries.mapNotNull { slot ->
+            val stack = living.getItemBySlot(slot)
+            if (stack.isEmpty) null else slot to stack
+        }
+        if (equipped.isEmpty()) return "(no equipped items)"
+
+        val combined = labelFor(entity)
+        val index = discoveredTextures.getOrPut(combined) {
             val next = discoveredTextures.size + 1
-            modMessage("§bCustom ESP debug: Texture #$next -> $texture")
+            val details = equipped.joinToString(" | ") { (slot, stack) ->
+                val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
+                val signals = stack.disguiseSignals()
+                "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
+            }
+            modMessage("§bCustom ESP debug: Texture #$next -> $details")
             next
         }
         return "Texture #$index"
