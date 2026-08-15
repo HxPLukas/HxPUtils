@@ -32,7 +32,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
  * "the GUI opened but nothing after that ever happens."
  *
  * Slot layout confirmed live (2026-08-15): loadouts 1-12 sit 3-per-row at slots 14/15/16, 23/24/25, 32/33/34,
- * 41/42/43 (each row +9 from the last). Loadout 13+ needs the "scroll down" button at slot 45 clicked once
+ * 41/42/43 (each row +9 from the last). Loadout 13+ needs the "scroll down" button (Next Page, confirmed at
+ * slot 44) clicked once
  * first (13-24 then reuse the exact same 1-12 layout); further pages would need another scroll click per 12
  * loadouts, unverified since only up to 24 was confirmed. The GUI's own title isn't confirmed live either, so
  * this doesn't gate on it - it just trusts that whatever screen opens right after `/loadout`, while a loadout
@@ -56,7 +57,9 @@ object AutoLoadout : Module(
     private const val FIRST_ROW_SLOT = 14
     private const val COLUMNS_PER_ROW = 3
     private const val SLOTS_PER_ROW_DOWN = 9
-    private const val SCROLL_DOWN_SLOT = 45
+
+    /** Confirmed live (2026-08-15) via a full slot dump: "Next Page" sits at 44, not the originally assumed 45 - same -1 shift as [FIRST_ROW_SLOT]. */
+    private const val SCROLL_DOWN_SLOT = 44
 
     private const val GUI_UPDATE_TIMEOUT_MS = 5000L
     private const val GUI_UPDATE_SETTLE_MS = 200L
