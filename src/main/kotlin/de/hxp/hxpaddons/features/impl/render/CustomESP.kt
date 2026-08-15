@@ -30,6 +30,9 @@ import de.hxp.hxpaddons.utils.render.drawText
 import de.hxp.hxpaddons.utils.render.drawWireFrameBox
 import de.hxp.hxpaddons.utils.renderBoundingBox
 import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.network.chat.ClickEvent
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.HoverEvent
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
@@ -490,6 +493,17 @@ object CustomESP : Module(
      * real Target Profile match) in the exact same field order as [TargetProfileEditScreen]: Entity Type, Name,
      * Skin/Model ID, Item Held, Helmet, Chestplate, Leggings, Boots - so any value shown here can be copied
      * straight into a new profile's matching fields, unlike [dumpLookedAtEntity]'s "everything readable" dump.
+     *
+     * Bugfix (2026-08-16, on request - "wenn ich die skin id kopiere und dort rein mache kriegt er die mobs
+     * nicht ... obwohl ich neben dem mob stehe von welchem ich gerade die skin id bekommen habe"): the
+     * Skin/Model ID line used to plain-text-join every signal with ", " when an entity carried more than one
+     * (e.g. both a skull texture AND a CustomModelData string) - manually selecting/copying that whole joined
+     * line and pasting it into a profile's Skin/Model ID field could never match, since [TargetProfile.matches]
+     * checks the typed value against each signal INDIVIDUALLY, and no single signal contains the full joined
+     * text of all of them. Also, a raw skin texture value is a long base64 string Minecraft's chat doesn't
+     * support click-drag-selecting anyway. Each signal now gets its own clickable line
+     * ([ClickEvent.CopyToClipboard]) so what lands on the clipboard is always the exact, single raw value the
+     * matcher actually compares against.
      */
     fun dumpClosestMatchedMob() {
         val player = mc.player
@@ -509,7 +523,14 @@ object CustomESP : Module(
 
         val living = closest as? LivingEntity
         val skinIds = closest.disguiseSignals
-        modMessage(if (skinIds.isEmpty()) "§7Skin/Model ID: §f(none found)" else "§7Skin/Model ID: §f${skinIds.joinToString(", ")}")
+        when {
+            skinIds.isEmpty() -> modMessage("§7Skin/Model ID: §f(none found)")
+            skinIds.size == 1 -> modMessage(copyableSkinIdLine("§7Skin/Model ID: §f${skinIds[0]}", skinIds[0]))
+            else -> {
+                modMessage("§7Skin/Model ID §7(${skinIds.size} separate signals - click one to copy just that value; pasting them joined together won't match anything):")
+                skinIds.forEachIndexed { i, id -> modMessage(copyableSkinIdLine("§8  #${i + 1}: §f$id", id)) }
+            }
+        }
 
         fun slotDisplay(slot: EquipmentSlot): String {
             val stack = living?.getItemBySlot(slot)
@@ -521,4 +542,11 @@ object CustomESP : Module(
         modMessage("§7Leggings: §f${slotDisplay(EquipmentSlot.LEGS)}")
         modMessage("§7Boots: §f${slotDisplay(EquipmentSlot.FEET)}")
     }
+
+    /** One [dumpClosestMatchedMob] Skin/Model ID line, clickable to copy exactly [rawValue] (not [displayText]'s formatting) to the clipboard - see that function's own doc for why this matters. */
+    private fun copyableSkinIdLine(displayText: String, rawValue: String): Component =
+        Component.literal("$displayText §a[click to copy]").withStyle {
+            it.withClickEvent(ClickEvent.CopyToClipboard(rawValue))
+                .withHoverEvent(HoverEvent.ShowText(Component.literal("§6Click to copy this exact value.")))
+        }
 }
