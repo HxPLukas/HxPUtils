@@ -8,7 +8,9 @@ import de.hxp.hxpaddons.features.Category
 import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.clickSlot
 import de.hxp.hxpaddons.utils.devMessage
+import de.hxp.hxpaddons.utils.loreString
 import de.hxp.hxpaddons.utils.modMessage
+import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.sendCommand
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -16,9 +18,10 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 
 /**
  * Equips a loadout by number via `/hxp loadout <n>`: runs `/loadout`, waits for the server's screen to open,
- * settles 600ms, clicks the target slot, waits 200ms, then closes. Replaces the old WardrobeKeybinds (`/wardrobe`,
- * per-slot keybinds 1-9) - loadouts go well past 9 now, so a command that takes any number fits better than a
- * fixed set of keybind slots.
+ * settles 600ms, scrolls if needed (each scroll click waits for the GUI to actually refresh before the next
+ * step, not a fixed delay - see [waitForGuiUpdate]), clicks the target slot, waits 200ms, then closes.
+ * Replaces the old WardrobeKeybinds (`/wardrobe`, per-slot keybinds 1-9) - loadouts go well past 9 now, so a
+ * command that takes any number fits better than a fixed set of keybind slots.
  *
  * Slot layout confirmed live (2026-08-15): loadouts 1-12 sit 3-per-row at slots 15/16/17, 24/25/26, 33/34/35,
  * 42/43/44 (each row +9 from the last). Loadout 13+ needs the "scroll down" button at slot 45 clicked once
@@ -41,6 +44,9 @@ object AutoLoadout : Module(
     private const val COLUMNS_PER_ROW = 3
     private const val SLOTS_PER_ROW_DOWN = 9
     private const val SCROLL_DOWN_SLOT = 45
+
+    /** [waitForGuiUpdate]'s ceiling on how long a single scroll click gets to actually refresh the GUI. */
+    private const val SCROLL_UPDATE_TIMEOUT_MS = 5000L
 
     private var pendingLoadout: Int? = null
 
@@ -76,10 +82,47 @@ object AutoLoadout : Module(
         val slot = FIRST_ROW_SLOT + row * SLOTS_PER_ROW_DOWN + column
 
         val player = mc.player ?: return
-        repeat(page) { player.clickSlot(containerId, SCROLL_DOWN_SLOT) }
-        player.clickSlot(containerId, slot)
+        repeat(page) { scrollIndex ->
+            val screen = mc.screen as? AbstractContainerScreen<*> ?: return
+            val beforeScroll = screen.contentSignature()
+            player.clickSlot(containerId, SCROLL_DOWN_SLOT)
 
+            // Waits for the server to actually send back the next page's contents (Hypixel refreshes this
+            // GUI's slots in place rather than opening a new Screen, so ScreenEvent.Open won't fire again
+            // here) before clicking again - a fixed delay would either wait longer than needed or risk
+            // clicking scroll/the target slot before the previous scroll's response ever arrived.
+            if (waitForGuiUpdate(beforeScroll) == null) {
+                devMessage("[AutoLoadout] /hxp loadout $loadout: scroll ${scrollIndex + 1}/$page didn't refresh the GUI in time, aborting.")
+                return
+            }
+        }
+
+        player.clickSlot(containerId, slot)
         delay(200L)
         mc.setScreen(null)
+    }
+
+    private fun AbstractContainerScreen<*>.topSlotCount(): Int = (menu.items.size - 36).coerceAtLeast(0)
+
+    /** Concatenation of every top-slot's name+count+lore - lets [waitForGuiUpdate] tell a genuinely-refreshed page apart from the pre-scroll one still sitting there. */
+    private fun AbstractContainerScreen<*>.contentSignature(): String =
+        (0 until topSlotCount()).joinToString("|") { i ->
+            val stack = menu.items.getOrNull(i)
+            if (stack == null || stack.isEmpty) "" else "${stack.hoverName.string}:${stack.count}:${stack.loreString.joinToString(";") { l -> l.noControlCodes }}"
+        }
+
+    /** Polls until the open screen's [contentSignature] differs from [previousSignature] (a genuine scroll update, not the same pre-click page), settles 200ms, and re-verifies before returning. */
+    private suspend fun waitForGuiUpdate(previousSignature: String, timeoutMs: Long = SCROLL_UPDATE_TIMEOUT_MS): AbstractContainerScreen<*>? {
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            val screen = mc.screen as? AbstractContainerScreen<*>
+            if (screen != null && screen.contentSignature() != previousSignature) {
+                delay(200L)
+                val settled = mc.screen as? AbstractContainerScreen<*>
+                if (settled != null && settled.contentSignature() != previousSignature) return settled
+            }
+            delay(50L)
+        }
+        return null
     }
 }
