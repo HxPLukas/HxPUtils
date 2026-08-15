@@ -2,8 +2,6 @@
 
 A Hypixel Skyblock QoL Fabric mod, based on Odin by odtheking (see [`LICENSE`](LICENSE)).
 
-Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golden Dragon Finder, Crystal Hollows Structure Finder, and Lobby Hopper.
-
 ## Requirements
 
 - Minecraft 26.1.2, Fabric Loader ≥ 0.19.3
