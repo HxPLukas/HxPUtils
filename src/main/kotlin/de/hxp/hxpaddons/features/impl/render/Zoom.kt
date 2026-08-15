@@ -14,15 +14,24 @@ import kotlin.math.sign
 /**
  * Hold [zoomKey] to reduce FOV, release to instantly go back to normal - e.g. to double-check an ESP box is
  * actually sitting on the right entity from a distance without needing to physically walk closer.
- * `key = null` + `toggled = true` deliberately suppresses the generic auto-registered "Keybind" row every
- * other module gets from [Module.key] (a plain press-to-toggle of [enabled], see [de.hxp.hxpaddons.events.InputEvent] -
- * fired once on press only, no release signal, so it can't express "held") and starts the module enabled by
- * default - after a report of exactly this confusion ("das mit dem keybind war falsch ich kann das feature
- * enablen und disablen aber nicht zoomen": the generic toggle row got bound instead of [zoomKey], which only
- * flips [enabled] and has nothing to do with actually zooming). [zoomKey] is Zoom's own explicit
- * [KeybindSetting] instead (same idea as [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s
- * `combatKey`/`rodKey`), polled every tick via [isDown] so holding/releasing can actually be told apart - and
- * now the only bind shown for this module at all.
+ *
+ * [zoomKey] is deliberately named literally "Keybind", not "Zoom Key" - [de.hxp.hxpaddons.clickgui.settings.ModuleButton]
+ * only ever renders a module's compact keybind chip (the one visible spot in this Click GUI to actually bind
+ * a key) by looking up `module.settings["Keybind"]` specifically, and separately excludes every
+ * [KeybindSetting] from the expandable settings column outright ("it's already covered by the compact chip
+ * below"). A [KeybindSetting] under any other name - the very first version of this, called "Zoom Key" -
+ * is therefore invisible in the GUI entirely: not the chip (wrong name) and not the settings column (blanket
+ * exclusion), which is exactly what got reported ("ich hab keine zoom key row"). `key = null` on the [Module]
+ * constructor above stops [de.hxp.hxpaddons.features.ModuleManager] from *also* auto-generating its own
+ * separate "Keybind" setting (a plain press-to-toggle of [enabled] via [de.hxp.hxpaddons.events.InputEvent] -
+ * fired once on press only, no release signal, so it can't express "held" in the first place) that would
+ * otherwise collide with this one and, before this fix, caused a different confusing report on its own
+ * ("ich kann das feature enablen und disablen aber nicht zoomen" - the generic toggle chip got bound instead
+ * of the zoom key, which only flips [enabled] and has nothing to do with actually zooming). `toggled = true`
+ * starts the module enabled by default, since there's no separate "enable" step needed anymore - holding the
+ * chip's bound key is the entire feature. [zoomKey] is polled every tick via [isDown] (same idea as
+ * [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s `combatKey`/`rodKey`) so holding/releasing can actually
+ * be told apart, unlike the discrete press-only [de.hxp.hxpaddons.events.InputEvent] path.
  *
  * Overrides [net.minecraft.client.Camera]'s own per-frame FOV computation directly (see
  * [de.hxp.hxpaddons.mixin.mixins.CameraMixin], injecting `calculateFov`'s return value) rather than driving
@@ -42,11 +51,11 @@ import kotlin.math.sign
 object Zoom : Module(
     name = "Zoom",
     key = null,
-    description = "Hold the Zoom Key to reduce FOV; scroll while held to zoom further in/out. Release to instantly go back to normal.",
+    description = "Hold this module's keybind (set via its chip in the module list) to reduce FOV; scroll while held to zoom further in/out. Release to instantly go back to normal.",
     category = Category.RENDER,
     toggled = true
 ) {
-    private val zoomKey by KeybindSetting("Zoom Key", GLFW.GLFW_KEY_UNKNOWN, desc = "Hold to zoom in, release to zoom back out.")
+    private val zoomKey by KeybindSetting("Keybind", GLFW.GLFW_KEY_UNKNOWN, desc = "Hold to zoom in, release to zoom back out.")
     private val startFov by NumberSetting("Start FOV", 20.0, 0.1, 90.0, 0.5, desc = "FOV as soon as the key is pressed, before any scrolling.")
     private val minFov by NumberSetting("Min FOV", 0.5, 0.1, 90.0, 0.1, desc = "The lowest FOV scrolling further in can reach - no floor beyond the setting's own range, unlike vanilla's FOV slider.")
     private val scrollStep by NumberSetting("Scroll Step", 1.0, 0.1, 20.0, 0.1, desc = "How much FOV changes per scroll notch.")
