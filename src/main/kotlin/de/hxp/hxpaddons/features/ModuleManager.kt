@@ -38,6 +38,7 @@ import de.hxp.hxpaddons.features.impl.general.CompactChat
 import de.hxp.hxpaddons.features.impl.general.CopyChat
 import de.hxp.hxpaddons.features.impl.general.LobbyHopper
 import de.hxp.hxpaddons.features.impl.general.ModIdHider
+import de.hxp.hxpaddons.features.impl.general.NameChanger
 import de.hxp.hxpaddons.features.impl.general.SmoothWorldLoading
 import de.hxp.hxpaddons.features.impl.mining.CrystalHollowsMap
 import de.hxp.hxpaddons.features.impl.mining.CrystalHollowsStructureFinder
@@ -99,6 +100,7 @@ object ModuleManager {
             CompactChat,
             CopyChat,
             ModIdHider,
+            NameChanger,
             SmoothWorldLoading,
             LobbyHopper,
             GreenhouseTimer,
