@@ -67,6 +67,9 @@ val mainCommand = Commodore("hxpaddons", "hxp") {
         literal("dump") {
             runs { CustomESP.dumpLookedAtEntity() }
         }
+        literal("mob") {
+            runs { CustomESP.dumpClosestMatchedMob() }
+        }
     }
 
     literal("recipe") {
@@ -94,6 +97,7 @@ private fun printHelp() {
     modMessage("§f/hxp garden reset §7- resets the Phantom Leaf Solver.")
     modMessage("§f/hxp loadout <n> §7- equips loadout n via /loadout.")
     modMessage("§f/hxp esp dump §7- dumps every readable field for whatever entity you're looking at.")
+    modMessage("§f/hxp esp mob §7- dumps the closest ESP'd entity's data in Target Profile field order (Entity Type, Name, Skin ID, Item Held, Helmet, Chestplate, Leggings, Boots).")
     modMessage("§f/hxp wip §7- toggles WIP modules in the Click GUI.")
 }
 

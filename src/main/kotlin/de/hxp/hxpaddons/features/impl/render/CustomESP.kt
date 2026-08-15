@@ -475,4 +475,43 @@ object CustomESP : Module(
             modMessage("§8  #${value.id()}: §f${value.value()}")
         }
     }
+
+    /**
+     * `/hxp esp mob` - on request ("er soll bei dem command alle daten zum closesten espten mob angeben welche
+     * man im gui einstellen kann. es soll in der gleichen reihenfolge sein"), dumps the closest currently
+     * highlighted entity (i.e. currently in [entities] - debug/highlight-everything mode counts, same as any
+     * real Target Profile match) in the exact same field order as [TargetProfileEditScreen]: Entity Type, Name,
+     * Skin/Model ID, Item Held, Helmet, Chestplate, Leggings, Boots - so any value shown here can be copied
+     * straight into a new profile's matching fields, unlike [dumpLookedAtEntity]'s "everything readable" dump.
+     */
+    fun dumpClosestMatchedMob() {
+        val player = mc.player
+        if (player == null) {
+            modMessage("§cNot in a world right now.")
+            return
+        }
+        val closest = entities.filter { it.isAlive }.minByOrNull { player.distanceToSqr(it) }
+        if (closest == null) {
+            modMessage("§cNo currently highlighted entity found - enable Custom ESP with an empty Target Profiles list (or a matching profile) first.")
+            return
+        }
+
+        modMessage("§6=== Closest ESP'd Mob (${"%.2f".format(player.distanceTo(closest))} blocks) ===")
+        modMessage("§7Entity Type: §f${BuiltInRegistries.ENTITY_TYPE.getKey(closest.type)}")
+        modMessage("§7Name: §f${closest.name.string.noControlCodes}")
+
+        val living = closest as? LivingEntity
+        val skinIds = living?.let { l -> EquipmentSlot.entries.flatMap { l.getItemBySlot(it).disguiseSignals } }.orEmpty()
+        modMessage(if (skinIds.isEmpty()) "§7Skin/Model ID: §f(none found)" else "§7Skin/Model ID: §f${skinIds.joinToString(", ")}")
+
+        fun slotDisplay(slot: EquipmentSlot): String {
+            val stack = living?.getItemBySlot(slot)
+            return if (stack == null || stack.isEmpty) "(none)" else stack.hoverName.string.noControlCodes
+        }
+        modMessage("§7Item Held: §f${slotDisplay(EquipmentSlot.MAINHAND)}")
+        modMessage("§7Helmet: §f${slotDisplay(EquipmentSlot.HEAD)}")
+        modMessage("§7Chestplate: §f${slotDisplay(EquipmentSlot.CHEST)}")
+        modMessage("§7Leggings: §f${slotDisplay(EquipmentSlot.LEGS)}")
+        modMessage("§7Boots: §f${slotDisplay(EquipmentSlot.FEET)}")
+    }
 }
