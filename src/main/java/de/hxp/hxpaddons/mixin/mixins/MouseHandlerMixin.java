@@ -19,6 +19,10 @@ public class MouseHandlerMixin {
     private double xpos;
     @Shadow
     private double ypos;
+    @Shadow
+    private double accumulatedDX;
+    @Shadow
+    private double accumulatedDY;
 
     @Unique
     private double beforeX;
@@ -39,6 +43,20 @@ public class MouseHandlerMixin {
     private void hxp$handleZoomScroll(long window, double xOffset, double yOffset, CallbackInfo ci) {
         if (Zoom.onScroll(yOffset)) {
             ci.cancel();
+        }
+    }
+
+    // turnPlayer reads accumulatedDX/DY directly off this instance every time it needs them (never caches
+    // them into a local first), and they're unconditionally zeroed out again right after this method returns
+    // (see handleAccumulatedMovement) regardless of what we do to them here - so scaling them at HEAD, before
+    // any of turnPlayer's own reads, correctly and safely reduces the effective mouse delta this whole turn
+    // uses without needing to touch anything downstream.
+    @Inject(method = "turnPlayer", at = @At("HEAD"))
+    private void hxp$scaleZoomSensitivity(double partialTick, CallbackInfo ci) {
+        double scale = Zoom.sensitivityMultiplier();
+        if (scale != 1.0) {
+            this.accumulatedDX *= scale;
+            this.accumulatedDY *= scale;
         }
     }
 }
