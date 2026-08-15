@@ -39,18 +39,22 @@ jobs:
 
       # Requires a repository secret named DISCORD_WEBHOOK_URL (Settings -> Secrets and variables ->
       # Actions -> New repository secret). Left as continue-on-error so a missing/misconfigured webhook
-      # doesn't turn an otherwise-successful release red.
+      # doesn't turn an otherwise-successful release red. Sends the JAR itself as a file attachment (not
+      # just a link to the GitHub Release) - multipart/form-data, not JSON, since a plain webhook POST
+      # can't carry a binary attachment alongside the embed.
       - name: notify discord
         continue-on-error: true
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
-          JAR_NAME=$(basename "$(ls build/libs/HxPUtils-*.jar | grep -v sources)")
+          JAR_PATH=$(ls build/libs/HxPUtils-*.jar | grep -v sources)
+          JAR_NAME=$(basename "$JAR_PATH")
+          PAYLOAD=$(jq -n \
+            --arg title "HxPUtils $TAG released" \
+            --arg url "https://github.com/${{ github.repository }}/releases/tag/$TAG" \
+            --arg desc "New HxPUtils build available: **$JAR_NAME**" \
+            '{embeds: [{title: $title, url: $url, description: $desc, color: 3447003}]}')
           curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg title "HxPUtils $TAG released" \
-              --arg url "https://github.com/${{ github.repository }}/releases/tag/$TAG" \
-              --arg desc "New HxPUtils build available: **$JAR_NAME**" \
-              '{embeds: [{title: $title, url: $url, description: $desc, color: 3447003}]}')"
+            -F "payload_json=$PAYLOAD" \
+            -F "file=@$JAR_PATH"
