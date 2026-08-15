@@ -52,14 +52,15 @@ import kotlin.math.max
  * exceptions from either.
  *
  * Debug mode ([entityNames] left empty): highlights literally every entity instead of filtering. With
- * [debugShowNames] also on (2026-08-13: split out into its own explicit toggle, on request - "es soll nicht
- * immer so sein sondern nur wenn das feld leer ist und es dann da eingestellt ist" - labeling used to be
- * unconditional the moment the list was empty, now it's an opt-in on top of that), each entity's own name/type
- * is additionally drawn as floating text above it (see [drawText]) - lets a player identify an unfamiliar
- * entity's exact name/type before adding it to the list, on request ("ob sachen bei denen man sich unsicher
- * ist wie das entity heißt auch espn zu können"). [debugShowNames] itself only has any effect (and only shows
- * up enabled in the Click GUI, via [withDependency]) while [entityNames] is empty. [labelSize] (2026-08-13, on
- * request - "die namen von den entity in der größe verändern") is a user-controlled multiplier on top of the
+ * [showEntityNames] also on, each entity's own name/type is additionally drawn as floating text above it (see
+ * [drawText]) - lets a player identify an unfamiliar entity's exact name/type before adding it to the list, on
+ * request ("ob sachen bei denen man sich unsicher ist wie das entity heißt auch espn zu können"). 2026-08-13:
+ * [showEntityNames] originally only applied in debug mode (split out into its own explicit toggle on request -
+ * "es soll nicht immer so sein sondern nur wenn das feld leer ist und es dann da eingestellt ist"); broadened
+ * back the same way 2026-08-16 on request ("hinzufügen das er ... darüber den namen anzeigt", e.g. searching
+ * for "Treasure Hunter" and seeing that name drawn above whatever it matched) - it now shows a name/type label
+ * above ANY highlighted entity, whether that's debug mode's highlight-everything or a real filtered search.
+ * [labelSize] (2026-08-13, on request - "die namen von den entity in der größe verändern") is a user-controlled multiplier on top of the
  * distance-based auto-scaling both this label and the particle debug label ([particleDebugShowNames]) already
  * use (see [labelScale]) - shared by both rather than two separate size settings.
  *
@@ -90,7 +91,7 @@ import kotlin.math.max
  * problem, then added back the same day on request ("auch wenn er dann viele hat aber man kann particles ja
  * togglen dann ist das ja egal und trotzdem um neue sachen zu machen hilfreich" - Particle ESP is its own
  * toggle, so a noisy "everything" view is fine to turn on only while actively looking for something new). With
- * [particleDebugShowNames] also on (same idea as [debugShowNames], only enabled while [particleTypes] is
+ * [particleDebugShowNames] also on (same idea as [showEntityNames], only enabled while [particleTypes] is
  * blank), each highlighted particle's registry name is drawn next to it. A particle is a one-tick event with
  * no entity to keep glowing, so matches are tracked as plain positions with a [particleHighlightMs] fade timer
  * ([TrackedParticle]) instead of being registered with [EntityOutlineESP] - always drawn as a small box
@@ -154,13 +155,13 @@ object CustomESP : Module(
         "Scan Distance", "64", length = 10,
         desc = "Maximum distance (in blocks) an entity can be from you to get matched/highlighted - type any number, no fixed upper limit."
     )
-    private val debugShowNames by BooleanSetting(
-        "Debug: Show Entity Names", false,
-        desc = "Shows each highlighted entity's name/type as floating text above it. Only has any effect while Entity Names is empty (highlight-everything mode) - it's not meant to label a filtered list, only to help identify unfamiliar entities."
-    ).withDependency { entityNames.isBlank() }
+    private val showEntityNames by BooleanSetting(
+        "Show Entity Names", false,
+        desc = "Shows each highlighted entity's name/type as floating text above it - both while highlighting everything (empty Entity Names) and while actively matching a specific search, e.g. seeing \"Treasure Hunter\" above whatever that search matched."
+    )
     private val labelSize by NumberSetting(
         "Label Size", 1.0, 0.1, 5.0, 0.1,
-        desc = "Scales the floating name labels (Debug: Show Entity Names and Debug: Show Particle Names) up or down - they otherwise auto-scale with distance to stay a roughly constant apparent size, this is a multiplier on top of that."
+        desc = "Scales the floating name labels (Show Entity Names and Debug: Show Particle Names) up or down - they otherwise auto-scale with distance to stay a roughly constant apparent size, this is a multiplier on top of that."
     )
     private val ignoreArmorStandVisual by BooleanSetting(
         "Ignore Armor Stands (Box/Outline)", true,
@@ -310,7 +311,7 @@ object CustomESP : Module(
                     else drawEntityBox(entity.renderBoundingBox)
                 }
 
-                if (debugModeActive && debugShowNames && !(isArmorStand && ignoreArmorStandLabels)) {
+                if (showEntityNames && !(isArmorStand && ignoreArmorStandLabels)) {
                     val box = entity.renderBoundingBox
                     val labelPos = Vec3((box.minX + box.maxX) / 2.0, box.maxY + 0.3, (box.minZ + box.maxZ) / 2.0)
                     val dist = player?.position()?.distanceTo(labelPos) ?: 0.0
@@ -383,7 +384,7 @@ object CustomESP : Module(
     }
 
     /**
-     * The text drawn above an entity in debug mode (see [debugShowNames]) - identical to [labelFor] except in
+     * The text drawn above an entity when [showEntityNames] is on - identical to [labelFor] except in
      * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
      * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
      * "Texture #2", ...) via [discoveredTextures], both drawn in-world and logged once via [devMessage] (only
