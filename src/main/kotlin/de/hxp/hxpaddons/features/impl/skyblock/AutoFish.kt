@@ -2,6 +2,7 @@ package de.hxp.hxpaddons.features.impl.skyblock
 
 import de.hxp.hxpaddons.HxPMod
 import de.hxp.hxpaddons.HxPMod.mc
+import de.hxp.hxpaddons.clickgui.settings.impl.SelectorSetting
 import de.hxp.hxpaddons.events.TickEvent
 import de.hxp.hxpaddons.events.core.on
 import de.hxp.hxpaddons.features.Category
@@ -11,6 +12,7 @@ import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.playAlertSound
 import de.hxp.hxpaddons.utils.simulateKeyPress
+import de.hxp.hxpaddons.utils.simulateRightClick
 import de.hxp.hxpaddons.utils.useHeldItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -29,8 +31,18 @@ object AutoFish : Module(
 ) {
     private const val MAX_CLICKS_PER_MOB = 3
 
+    private val rightClickMethod by SelectorSetting(
+        "Right Click Method", "Packet", listOf("Packet", "Mouse Simulation"),
+        desc = "Packet sends the right-click directly, working even while the game window is tabbed out. Mouse Simulation uses a real OS-level click instead, which requires the window to have focus - use this if a server-side anti-cheat flags the packet method."
+    )
+    private const val RIGHT_CLICK_VIA_MOUSE_SIM = 1
+
     private var actionCooldown = false
     private var lastTriggeredStandId = -1
+
+    private fun rightClick() {
+        if (rightClickMethod == RIGHT_CLICK_VIA_MOUSE_SIM) simulateRightClick() else rightClick()
+    }
 
     private fun findCombatTarget(level: Level, origin: Vec3): LivingEntity? {
         val area = AABB(origin.x - 6, origin.y - 6, origin.z - 6, origin.x + 6, origin.y + 6, origin.z + 6)
@@ -74,7 +86,7 @@ object AutoFish : Module(
             actionCooldown = true
             HxPMod.scope.launch {
                 delay(Random.nextLong(0, 131))
-                useHeldItem()
+                rightClick()
 
                 if (Combat.enabled) {
                     delay(Random.nextLong(110, 161))
@@ -101,21 +113,21 @@ object AutoFish : Module(
                         target != null -> {
                             var clicks = 0
                             while (enabled && target.isAlive && !target.isRemoved && clicks < MAX_CLICKS_PER_MOB) {
-                                useHeldItem()
+                                rightClick()
                                 clicks++
                                 delay(Random.nextLong(60, 91))
                             }
                         }
-                        else -> useHeldItem()
+                        else -> rightClick()
                     }
 
                     delay(Random.nextLong(80, 121))
                     simulateKeyPress(Combat.rodKey)
                     delay(Random.nextLong(160, 211))
-                    useHeldItem()
+                    rightClick()
                 } else {
                     delay(Random.nextLong(180, 261))
-                    useHeldItem()
+                    rightClick()
                 }
                 delay(2000L)
                 actionCooldown = false
