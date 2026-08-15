@@ -14,6 +14,7 @@ import net.minecraft.resources.Identifier
 import net.minecraft.sounds.SoundEvent
 import net.minecraft.sounds.SoundEvents
 import net.minecraft.util.StringUtil
+import net.minecraft.world.InteractionHand
 import net.minecraft.world.scores.DisplaySlot
 import net.minecraft.world.scores.PlayerTeam
 
@@ -101,6 +102,21 @@ fun simulateRightClick() {
         robot.mousePress(InputEvent.BUTTON3_DOWN_MASK)
         robot.mouseRelease(InputEvent.BUTTON3_DOWN_MASK)
     }.onFailure { modMessage("§c[simulateRightClick] ${it::class.simpleName}: ${it.message}") }
+}
+
+/**
+ * Right-clicks with the held item exactly like vanilla does when nothing clickable (block/entity) is in
+ * front of you - calls [net.minecraft.client.multiplayer.MultiPlayerGameMode.useItem] directly, the same
+ * internal method vanilla's own click handling falls through to when the crosshair hits nothing usable
+ * (see `Minecraft.startUseItem`) - instead of [simulateRightClick]'s OS-level Robot click, which requires
+ * the game window to actually have OS focus and clicks whatever window does instead if it doesn't (e.g.
+ * tabbed out). Self-dispatches to the main/render thread, so it's safe to call from a coroutine.
+ */
+fun useHeldItem() {
+    mc.execute {
+        val player = mc.player ?: return@execute
+        mc.gameMode?.useItem(player, InteractionHand.MAIN_HAND)
+    }
 }
 
 fun simulateMiddleClick() {

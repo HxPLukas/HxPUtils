@@ -11,7 +11,7 @@ import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.playAlertSound
 import de.hxp.hxpaddons.utils.simulateKeyPress
-import de.hxp.hxpaddons.utils.simulateRightClick
+import de.hxp.hxpaddons.utils.useHeldItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.minecraft.world.entity.LivingEntity
@@ -74,7 +74,7 @@ object AutoFish : Module(
             actionCooldown = true
             HxPMod.scope.launch {
                 delay(Random.nextLong(0, 131))
-                simulateRightClick()
+                useHeldItem()
 
                 if (Combat.enabled) {
                     delay(Random.nextLong(110, 161))
@@ -101,21 +101,21 @@ object AutoFish : Module(
                         target != null -> {
                             var clicks = 0
                             while (enabled && target.isAlive && !target.isRemoved && clicks < MAX_CLICKS_PER_MOB) {
-                                simulateRightClick()
+                                useHeldItem()
                                 clicks++
                                 delay(Random.nextLong(60, 91))
                             }
                         }
-                        else -> simulateRightClick()
+                        else -> useHeldItem()
                     }
 
                     delay(Random.nextLong(80, 121))
                     simulateKeyPress(Combat.rodKey)
                     delay(Random.nextLong(160, 211))
-                    simulateRightClick()
+                    useHeldItem()
                 } else {
                     delay(Random.nextLong(180, 261))
-                    simulateRightClick()
+                    useHeldItem()
                 }
                 delay(2000L)
                 actionCooldown = false
