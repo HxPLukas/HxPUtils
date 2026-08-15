@@ -1,8 +1,11 @@
 package de.hxp.hxpaddons.features.impl.render
 
+import de.hxp.hxpaddons.clickgui.TargetProfilesScreen
 import de.hxp.hxpaddons.clickgui.settings.Setting.Companion.withDependency
+import de.hxp.hxpaddons.clickgui.settings.impl.ActionSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.BooleanSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.ColorSetting
+import de.hxp.hxpaddons.clickgui.settings.impl.ListSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.SelectorSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.StringSetting
@@ -18,6 +21,7 @@ import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
 import de.hxp.hxpaddons.utils.devMessage
 import de.hxp.hxpaddons.utils.disguiseSignals
+import de.hxp.hxpaddons.utils.handlers.schedule
 import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
@@ -151,6 +155,14 @@ object CustomESP : Module(
         "Ignore Entity Names", "", length = 256,
         desc = "Comma-separated list to NEVER highlight, matched the same way (case-insensitive substring, same Match Mode) as Entity Names - takes priority over everything else, including a match in Entity Names itself and the empty-list highlight-everything debug mode."
     )
+    val targetProfiles by ListSetting<TargetProfile, MutableList<TargetProfile>>("Target Profiles", mutableListOf())
+
+    init {
+        registerSetting(ActionSetting(
+            "Manage Target Profiles",
+            "Opens a manager for advanced multi-field targets (entity type, name, skin/model id, held item, armor) - independent of Entity Names/Match Mode above. An entity matches a profile if ALL of that profile's filled-in fields match; leave a field blank to ignore it. Highlighted if it matches ANY saved profile."
+        ) { schedule(0) { mc.setScreen(TargetProfilesScreen) } })
+    }
     private val scanDistanceInput by StringSetting(
         "Scan Distance", "64", length = 10,
         desc = "Maximum distance (in blocks) an entity can be from you to get matched/highlighted - type any number, no fixed upper limit."
@@ -231,7 +243,10 @@ object CustomESP : Module(
 
             val names = entityNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
             val ignoreNames = ignoreEntityNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            debugModeActive = names.isEmpty()
+            // Only "highlight everything" while NEITHER matching path has anything specified - a non-empty
+            // Target Profiles list (even with Entity Names left blank) means the profiles are deliberately
+            // doing the filtering instead, not "match nothing so show everything".
+            debugModeActive = names.isEmpty() && targetProfiles.isEmpty()
             val maxDistSq = currentScanDistance() * currentScanDistance()
 
             entities.clear()
@@ -245,7 +260,13 @@ object CustomESP : Module(
                 // mode (on request - "wenn nichts eingegeben ist oder es so weit matchen würde er trotzdem
                 // geht das ich die ignoren lassen kann").
                 if (ignoreNames.any { name -> label.contains(name, ignoreCase = true) }) return@forEach
-                if (debugModeActive || names.any { name -> label.contains(name, ignoreCase = true) }) {
+                val matchedBySearch = names.any { name -> label.contains(name, ignoreCase = true) }
+                // Target Profiles (see TargetProfile.kt's own doc) - an entirely separate, independent
+                // matching path from Entity Names/Match Mode above: each profile can constrain several
+                // fields (type, name, skin/model id, held item, armor) at once, all of which must match
+                // together, and an entity is highlighted if it satisfies ANY one saved profile.
+                val matchedByProfile = targetProfiles.any { it.matches(e) }
+                if (debugModeActive || matchedBySearch || matchedByProfile) {
                     entities.add(e)
                     // Dungeon-style mobs (e.g. "Crypt Ghoul") carry their real display name on a separate
                     // invisible ArmorStand riding just above them, not on the mob entity itself - same
@@ -259,8 +280,9 @@ object CustomESP : Module(
                     // armorstand und mob highlighten fürs erste") via [forceVisibleArmorStands], bypassing
                     // [ignoreArmorStandVisual] entirely for this specific match - that setting is about
                     // filtering out decorative ArmorStands from debug/highlight-everything mode, not this
-                    // explicit name match.
-                    if (matchMode != MATCH_MODE_TYPE && e is ArmorStand) {
+                    // explicit name match. A Target Profiles match on an ArmorStand resolves too - profiles
+                    // exist specifically for this exact "named mob whose real entity carries nothing" case.
+                    if (e is ArmorStand && (matchedByProfile || matchMode != MATCH_MODE_TYPE)) {
                         forceVisibleArmorStands.add(e)
                         resolveMobBelow(e)?.let { entities.add(it) }
                     }
