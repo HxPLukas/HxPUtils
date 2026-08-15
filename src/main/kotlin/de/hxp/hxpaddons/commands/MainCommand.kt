@@ -8,6 +8,7 @@ import de.hxp.hxpaddons.clickgui.ClickGUI
 import de.hxp.hxpaddons.features.ModuleManager
 import de.hxp.hxpaddons.features.impl.garden.PhantomLeafSolver
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
+import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
 import de.hxp.hxpaddons.features.impl.skyblock.BazaarFlipper
 import de.hxp.hxpaddons.features.impl.skyblock.FuseCheck
 import de.hxp.hxpaddons.features.impl.skyblock.Fuser
@@ -70,6 +71,10 @@ val mainCommand = Commodore("hxpaddons", "hxp") {
                 modMessage("§aPhantom Leaf Solver reset.")
             }
         }
+    }
+
+    literal("loadout") {
+        runs { n: Int -> AutoLoadout.equip(n) }
     }
 
     literal("recipe") {
@@ -230,6 +235,7 @@ private fun printHelp() {
     modMessage("§f/hxp craftflip §7- scans the Bazaar for profitable craft flips.")
     modMessage("§f/hxp fish [stop] §7- toggles Auto Fish.")
     modMessage("§f/hxp garden reset §7- resets the Phantom Leaf Solver.")
+    modMessage("§f/hxp loadout <n> §7- equips loadout n via /loadout.")
     modMessage("§f/hxp wip §7- toggles WIP modules in the Click GUI.")
 }
 
