@@ -16,6 +16,7 @@ import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
+import de.hxp.hxpaddons.utils.disguiseSignals
 import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
@@ -23,15 +24,12 @@ import de.hxp.hxpaddons.utils.render.drawFilledBox
 import de.hxp.hxpaddons.utils.render.drawText
 import de.hxp.hxpaddons.utils.render.drawWireFrameBox
 import de.hxp.hxpaddons.utils.renderBoundingBox
-import de.hxp.hxpaddons.utils.texture
-import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
-import net.minecraft.world.item.ItemStack
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
@@ -365,39 +363,19 @@ object CustomESP : Module(
     }
 
     /**
-     * Every readable "custom disguise" signal a single equipped item carries - its skull skin texture value
-     * (see [de.hxp.hxpaddons.utils.texture]), each non-blank [net.minecraft.world.item.component.CustomModelData]
-     * string, and its [net.minecraft.world.item.component.DataComponents.ITEM_MODEL] identifier if set. A
-     * disguise doesn't have to be a custom-skin skull - Odonata turned out to have none (2026-08-16, reported
-     * live: "no head texture obwohl sie als entity ein armorstand sind und es visuell was zu sehen gibt was
-     * nicht partikel sind"), meaning whatever gives it its visible model is a different item/slot/mechanism
-     * entirely - most likely a plain item with a resource-pack-remapped model via `CustomModelData`/
-     * `ItemModel` instead of a skull skin. Scanning every possible signal type (not just skull textures) and
-     * every equipped slot (not just [EquipmentSlot.HEAD], see [labelFor]) means whichever mechanism is
-     * actually behind it still gets picked up, without needing to already know which one it is in advance.
-     */
-    private fun ItemStack.disguiseSignals(): List<String> {
-        if (isEmpty) return emptyList()
-        val signals = mutableListOf<String>()
-        texture?.let { signals.add(it) }
-        get(DataComponents.CUSTOM_MODEL_DATA)?.strings()?.forEach { if (it.isNotBlank()) signals.add(it) }
-        get(DataComponents.ITEM_MODEL)?.let { signals.add(it.toString()) }
-        return signals
-    }
-
-    /**
-     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], every [disguiseSignals] value found across
-     * ALL of its equipped slots (not just [EquipmentSlot.HEAD] - see that function's own doc for why) joined
-     * together in [MATCH_MODE_TEXTURE] (empty string if it's not a [LivingEntity], or has no equipped item
-     * carrying any signal at all - matches nothing, same as any other blank search term would), its current
-     * display name/nametag otherwise - this is the value actually compared against
+     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], every [de.hxp.hxpaddons.utils.disguiseSignals]
+     * value found across ALL of its equipped slots (not just [EquipmentSlot.HEAD] - a disguise doesn't have to
+     * be a custom-skin skull; Odonata turned out to have none, see [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP]'s own doc for the full story)
+     * joined together in [MATCH_MODE_TEXTURE] (empty string if it's not a [LivingEntity], or has no equipped
+     * item carrying any signal at all - matches nothing, same as any other blank search term would), its
+     * current display name/nametag otherwise - this is the value actually compared against
      * [entityNames]/[ignoreEntityNames]. For the debug-mode floating label specifically, see [debugLabelFor]
      * instead - the raw joined value can be long/unreadable and impossible to copy back out of 3D world text.
      */
     private fun labelFor(entity: Entity): String = when (matchMode) {
         MATCH_MODE_TYPE -> entity.type.description.string
         MATCH_MODE_TEXTURE -> (entity as? LivingEntity)
-            ?.let { living -> EquipmentSlot.entries.flatMap { living.getItemBySlot(it).disguiseSignals() } }
+            ?.let { living -> EquipmentSlot.entries.flatMap { living.getItemBySlot(it).disguiseSignals } }
             ?.joinToString("|").orEmpty()
         else -> entity.name.string.noControlCodes
     }
@@ -432,7 +410,7 @@ object CustomESP : Module(
             val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
             val details = equipped.joinToString(" | ") { (slot, stack) ->
                 val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
-                val signals = stack.disguiseSignals()
+                val signals = stack.disguiseSignals
                 "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
             }
             modMessage("§bCustom ESP debug: Texture #$next ($entityInfo) -> $details")

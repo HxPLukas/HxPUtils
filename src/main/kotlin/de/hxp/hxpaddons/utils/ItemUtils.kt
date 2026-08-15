@@ -52,6 +52,25 @@ val ItemStack.texture: String?
     get() =
         get(DataComponents.PROFILE)?.partialProfile()?.properties?.get("textures")?.firstOrNull()?.value
 
+/**
+ * Every readable "custom disguise" signal a single item carries - its skull skin [texture] value, each
+ * non-blank [net.minecraft.world.item.component.CustomModelData] string, and its
+ * [DataComponents.ITEM_MODEL] identifier if set. Shared by
+ * [de.hxp.hxpaddons.features.impl.render.CustomESP]'s Custom Texture match mode and
+ * [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP]'s Head Texture detection mode - both need to identify
+ * whichever mechanism Hypixel actually used to disguise something (a skull skin, or a resource-pack-remapped
+ * model via CustomModelData/ItemModel), without needing to already know which one in advance.
+ */
+val ItemStack.disguiseSignals: List<String>
+    get() {
+        if (isEmpty) return emptyList()
+        val signals = mutableListOf<String>()
+        texture?.let { signals.add(it) }
+        get(DataComponents.CUSTOM_MODEL_DATA)?.strings()?.forEach { if (it.isNotBlank()) signals.add(it) }
+        get(DataComponents.ITEM_MODEL)?.let { signals.add(it.toString()) }
+        return signals
+    }
+
 val strengthRegex = Regex("Strength: \\+(\\d+)")
 
 inline val ItemStack.strength: Int
