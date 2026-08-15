@@ -13,8 +13,7 @@ import de.hxp.hxpaddons.events.core.on
 import de.hxp.hxpaddons.features.Category
 import de.hxp.hxpaddons.features.Module
 import org.lwjgl.glfw.GLFW
-import kotlin.math.abs
-import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.sign
 
 /**
@@ -49,9 +48,15 @@ import kotlin.math.sign
  * [smoothMode] (on request, "ein mode der so smooth reinzoomt als so fade in ... und wenn man die kamera
  * bewegt es expotential und wenn meine maus still ist ... dass er dann noch so weiter dreht immer weniger"):
  * bundles two effects, both off by default (snap-instant zoom, raw mouse turning) unless enabled:
- *  - FOV fades toward its target exponentially (framerate-independent, via [smoothZoomSpeed]) instead of
- *    snapping - both zooming in/out AND scroll-adjusting the zoom level while held ease smoothly, computed
- *    every frame in [applyFov] using real elapsed time, not tick/frame count.
+ *  - FOV eases toward its target using an ease-in-out-expo curve (2026-08-15, on request - "er soll
+ *    expotentiell ansteigen und dann expotentiell abfallen lassen", i.e. the rate of change itself should
+ *    ramp up exponentially then back down, not the plain "starts fast, decays toward the target" curve the
+ *    first version of this used) - a fixed-duration tween from wherever the FOV currently is to the new
+ *    target (see [beginTransition]/[applyFov]), not an unbounded per-frame chase, so the shape is symmetric
+ *    and predictable regardless of framerate. Zoom-in and zoom-out each get their own duration
+ *    ([smoothZoomInDurationMs]/[smoothZoomOutDurationMs]) - split out after a report that zooming back out
+ *    felt too fast at the same speed as zooming in ("es ist mir zu schnell bei smooth wenn ich raus zoome"),
+ *    defaulting zoom-out slower than zoom-in.
  *  - Camera turning gets exponential smoothing *with inertia* (coasts a little after the mouse stops moving,
  *    decaying out) - rather than reimplementing that, this temporarily forces vanilla's own
  *    [net.minecraft.client.Options.smoothCamera] on for exactly as long as a zoom/fade is in progress
@@ -79,11 +84,15 @@ object Zoom : Module(
     )
     private val smoothMode by BooleanSetting(
         "Smooth Mode", false,
-        desc = "Fades FOV in/out exponentially instead of snapping instantly, and smooths camera turning (with a brief coast when you stop moving the mouse) while zoomed, via Minecraft's own Smooth Camera option."
+        desc = "Eases FOV in/out (exponential ramp up then down, not an instant snap) and smooths camera turning (with a brief coast when you stop moving the mouse) while zoomed, via Minecraft's own Smooth Camera option."
     )
-    private val smoothZoomSpeed by NumberSetting(
-        "Smooth Zoom Speed", 8.0, 1.0, 30.0, 0.5,
-        desc = "How quickly the FOV fade converges to its target - higher is snappier, lower is more gradual."
+    private val smoothZoomInDurationMs by NumberSetting(
+        "Smooth Zoom In Duration", 300.0, 50.0, 3000.0, 25.0, unit = "ms",
+        desc = "How long the ease takes when zooming in or adjusting the zoom level via scroll while held."
+    ).withDependency { smoothMode }
+    private val smoothZoomOutDurationMs by NumberSetting(
+        "Smooth Zoom Out Duration", 600.0, 50.0, 3000.0, 25.0, unit = "ms",
+        desc = "How long the ease takes when releasing the key and zooming back out - kept separate from zoom-in duration since the same speed can feel too fast on the way out."
     ).withDependency { smoothMode }
 
     /** Non-null while the key is held: the FOV Zoom is trying to reach/hold, adjustable by scroll. Null once released. */
@@ -92,8 +101,19 @@ object Zoom : Module(
     /** The actual FOV Zoom is currently outputting - equals [targetZoomFov] exactly outside [smoothMode]. Null means "not overriding at all right now". */
     private var displayedFov: Float? = null
 
-    private var lastFrameTimeNanos = 0L
     private var heldKey = false
+
+    // Smooth Mode tween state - a fixed-duration ease from transitionFrom to a target, not an unbounded
+    // per-frame chase, so easeInOutExpo's shape (slow -> fast -> slow) is symmetric and duration-accurate
+    // regardless of framerate. transitionFrom/transitionStartNanos/transitionDurationMs only get (re)armed
+    // lazily on the next applyFov call (needsNewTransition) since only that call - driven every frame from
+    // CameraMixin - actually has vanilla's live FOV on hand to seed a fade-in that starts from "idle".
+    private var needsNewTransition = false
+    private var pendingDurationMs = 0.0
+    private var fadingOut = false
+    private var transitionFrom = 0f
+    private var transitionStartNanos = 0L
+    private var transitionDurationMs = 1.0
 
     private var forcedSmoothCamera = false
     private var savedSmoothCameraSetting: Boolean? = null
@@ -114,9 +134,11 @@ object Zoom : Module(
             if (held && !heldKey) {
                 targetZoomFov = startFov.toFloat()
                 if (!smoothMode) displayedFov = startFov.toFloat()
+                else beginTransition(smoothZoomInDurationMs, fadingOut = false)
             } else if (!held && heldKey) {
                 targetZoomFov = null
                 if (!smoothMode) displayedFov = null
+                else beginTransition(smoothZoomOutDurationMs, fadingOut = true)
             }
             heldKey = held
 
@@ -133,16 +155,31 @@ object Zoom : Module(
         }
     }
 
+    private fun beginTransition(durationMs: Double, fadingOut: Boolean) {
+        needsNewTransition = true
+        pendingDurationMs = durationMs
+        this.fadingOut = fadingOut
+    }
+
     private fun resetState() {
         targetZoomFov = null
         displayedFov = null
         heldKey = false
-        lastFrameTimeNanos = 0L
+        needsNewTransition = false
+        fadingOut = false
         if (forcedSmoothCamera) {
             savedSmoothCameraSetting?.let { mc.options.smoothCamera = it }
             forcedSmoothCamera = false
             savedSmoothCameraSetting = null
         }
+    }
+
+    /** easings.net's easeInOutExpo - ramps up exponentially through the first half, then back down exponentially through the second, instead of linear/plain-decay interpolation. */
+    private fun easeInOutExpo(t: Double): Double = when {
+        t <= 0.0 -> 0.0
+        t >= 1.0 -> 1.0
+        t < 0.5 -> 2.0.pow(20.0 * t - 10.0) / 2.0
+        else -> (2.0 - 2.0.pow(-20.0 * t + 10.0)) / 2.0
     }
 
     /**
@@ -154,25 +191,34 @@ object Zoom : Module(
     fun applyFov(vanillaFov: Float): Float? {
         if (!enabled) return null
         val target = targetZoomFov
-        if (target == null && displayedFov == null) return null
+        if (target == null && displayedFov == null && !needsNewTransition) return null
 
         if (!smoothMode) return displayedFov
 
         val now = System.nanoTime()
-        val dt = if (lastFrameTimeNanos == 0L) 0.0 else ((now - lastFrameTimeNanos) / 1_000_000_000.0).coerceIn(0.0, 0.1)
-        lastFrameTimeNanos = now
+        if (needsNewTransition) {
+            transitionFrom = displayedFov ?: vanillaFov
+            transitionStartNanos = now
+            transitionDurationMs = pendingDurationMs.coerceAtLeast(1.0)
+            needsNewTransition = false
+        }
 
-        val current = displayedFov ?: vanillaFov
-        val chaseTarget = target ?: vanillaFov
-        val factor = if (dt <= 0.0) 0f else (1f - exp(-smoothZoomSpeed.toFloat() * dt.toFloat()))
-        val next = current + (chaseTarget - current) * factor
+        val elapsedMs = (now - transitionStartNanos) / 1_000_000.0
+        val t = (elapsedMs / transitionDurationMs).coerceIn(0.0, 1.0)
+        val eased = easeInOutExpo(t)
 
-        if (target == null && abs(next - vanillaFov) < 0.05f) {
+        // Fading out chases vanilla's own live FOV (which can itself move, e.g. a sprint FOV kick) instead of
+        // a fixed snapshot, so the ease still lands correctly even if vanilla's value changed mid-transition.
+        val to = if (fadingOut) vanillaFov else (target ?: vanillaFov)
+        val value = (transitionFrom + (to - transitionFrom) * eased).toFloat()
+
+        if (fadingOut && t >= 1.0) {
             displayedFov = null
             return null
         }
-        displayedFov = next
-        return next
+
+        displayedFov = value
+        return value
     }
 
     /** Read by [de.hxp.hxpaddons.mixin.mixins.MouseHandlerMixin]'s `turnPlayer` injection every time the mouse turns - 1.0 (no change) whenever not currently overriding the FOV at all. */
@@ -198,6 +244,7 @@ object Zoom : Module(
         val newTarget = (target - step).coerceIn(minFov.toFloat(), startFov.toFloat())
         targetZoomFov = newTarget
         if (!smoothMode) displayedFov = newTarget
+        else beginTransition(smoothZoomInDurationMs, fadingOut = false)
         return true
     }
 }
