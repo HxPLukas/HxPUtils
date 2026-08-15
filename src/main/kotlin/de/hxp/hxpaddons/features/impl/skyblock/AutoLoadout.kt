@@ -56,9 +56,11 @@ object AutoLoadout : Module(
 
     private const val GUI_UPDATE_TIMEOUT_MS = 5000L
     private const val GUI_UPDATE_SETTLE_MS = 200L
+    private const val DEBUG_LOG_WINDOW_MS = 4000L
 
     private var pendingLoadout: Int? = null
     private var job: Job? = null
+    private var debugWindowStartMs: Long = 0L
 
     override fun onDisable() {
         super.onDisable()
@@ -68,15 +70,35 @@ object AutoLoadout : Module(
 
     init {
         on<ScreenEvent.Open> {
-            val containerScreen = screen as? AbstractContainerScreen<*> ?: return@on
+            // Temporary: while pendingLoadout is set, log EVERY screen open (even non-container / non-matching
+            // ones) for a few seconds after the command, so it's visible in chat that this listener is even
+            // firing at all - separate from the loadout-matching logic below.
+            if (pendingLoadout != null && System.currentTimeMillis() - debugWindowStartMs <= DEBUG_LOG_WINDOW_MS) {
+                modMessage("§7Auto Loadout debug: screen opened -> ${screen::class.simpleName}" +
+                    ((screen as? AbstractContainerScreen<*>)?.let { " title=\"${it.title.string.noControlCodes}\"" } ?: ""))
+            }
+
+            // Not currently waiting for anything - stays silent, this fires on every unrelated screen open
+            // in the game.
             val loadout = pendingLoadout ?: return@on
+
+            // Temporarily modMessage (not devMessage) for every branch here, on request, while this is
+            // still being debugged live - so it's visible without needing Dev Messages on.
+            val containerScreen = screen as? AbstractContainerScreen<*>
+            if (containerScreen == null) {
+                modMessage("§cAuto Loadout debug: a screen opened while waiting for loadout $loadout, but it's not a container screen (${screen::class.simpleName}) - ignoring, still waiting.")
+                return@on
+            }
+
+            val title = containerScreen.title.string.noControlCodes
             // Doesn't consume pendingLoadout on a non-matching screen - a transitional/unrelated screen
             // opening in between shouldn't cancel waiting for the real loadout GUI.
-            if (!containerScreen.title.string.noControlCodes.contains("loadout", ignoreCase = true)) {
-                devMessage("[AutoLoadout] Ignoring non-matching screen while waiting for loadout $loadout: '${containerScreen.title.string.noControlCodes}'")
+            if (!title.contains("loadout", ignoreCase = true)) {
+                modMessage("§cAuto Loadout debug: screen opened with title \"$title\" - doesn't contain \"loadout\", ignoring, still waiting.")
                 return@on
             }
             pendingLoadout = null
+            modMessage("§bAuto Loadout debug: accepted screen with title \"$title\".")
 
             dumpScreen(containerScreen, "Opened for /hxp loadout $loadout")
             logLoadoutOneSlot(containerScreen)
@@ -101,7 +123,13 @@ object AutoLoadout : Module(
             modMessage("§eAuto Loadout is already running.")
             return
         }
+        // The module must be enabled/subscribed to the EventBus to receive ScreenEvent.Open at all - this
+        // module has no toggled=true/AlwaysActive, so without this, running the command alone (module off in
+        // the Click GUI, which is the default state) meant the listener below silently never fired, not even
+        // its devMessage branches. Same pattern as Fuser's own run().
+        if (!enabled) toggle()
         pendingLoadout = loadout
+        debugWindowStartMs = System.currentTimeMillis()
         sendCommand("loadout")
     }
 
