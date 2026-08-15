@@ -3,7 +3,6 @@ package de.hxp.hxpaddons.features.impl.render
 import de.hxp.hxpaddons.HxPMod.mc
 import de.hxp.hxpaddons.clickgui.settings.AlwaysActive
 import de.hxp.hxpaddons.clickgui.settings.Setting.Companion.withDependency
-import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.BooleanSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting.Companion.isDown
@@ -65,7 +64,6 @@ import kotlin.math.sign
  *    "coast down" being asked for, well-tested and free instead of a custom reimplementation.
  */
 @AlwaysActive
-@WipModule
 object Zoom : Module(
     name = "Zoom",
     key = null,
