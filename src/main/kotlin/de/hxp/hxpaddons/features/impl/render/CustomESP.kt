@@ -16,15 +16,19 @@ import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
+import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
 import de.hxp.hxpaddons.utils.render.drawFilledBox
 import de.hxp.hxpaddons.utils.render.drawText
 import de.hxp.hxpaddons.utils.render.drawWireFrameBox
 import de.hxp.hxpaddons.utils.renderBoundingBox
+import de.hxp.hxpaddons.utils.texture
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
@@ -109,6 +113,18 @@ import kotlin.math.max
  * [ignoreArmorStandVisual] (on by default) before ever reaching the render pass, making the match look like
  * it never fired.
  *
+ * Head Texture match mode (2026-08-16, on request - "kann man die auch irgendwie scannen", after explaining
+ * how Hypixel commonly disguises a mob/NPC with a player-head item carrying a custom skin instead of a
+ * readable name, e.g. Odonata-style hidden mobs): matches an entity's equipped `HEAD` slot item's raw skin
+ * texture value (see [de.hxp.hxpaddons.utils.texture], already existing in this codebase for reading a
+ * skull's custom skin off its `DataComponents.PROFILE` component) - the same identical-per-skin base64 string
+ * every time that exact disguise is worn, so it's just as reliable a match key as a name, and (per the same
+ * explanation) equipment data isn't necessarily gated behind the same close-range requirement Hypixel applies
+ * to some nametags. Since the raw value is long, unreadable, and impossible to copy out of rendered 3D world
+ * text, [debugLabelFor] substitutes a short "Texture #N" id for the floating label and chat-dumps the full
+ * value the first time each distinct one is seen, so the actual copy/paste-into-Entity-Names step happens via
+ * chat instead.
+ *
  * Entirely unverified live - first time this exact matching+labeling combination gets exercised.
  */
 object CustomESP : Module(
@@ -117,12 +133,12 @@ object CustomESP : Module(
     category = Category.RENDER
 ) {
     private val matchMode by SelectorSetting(
-        "Match Mode", "Entity Type", listOf("Entity Type", "Name Tag"),
-        desc = "Whether the Entity Names list is matched against each entity's Minecraft type (e.g. \"Zombie\") or its current display name/nametag."
+        "Match Mode", "Entity Type", listOf("Entity Type", "Name Tag", "Head Texture"),
+        desc = "Whether the Entity Names list is matched against each entity's Minecraft type (e.g. \"Zombie\"), its current display name/nametag, or its equipped head item's raw skin texture value (for entities disguised via a custom-skin player head, e.g. a hidden mob or NPC with no readable name)."
     )
     private val entityNames by StringSetting(
         "Entity Names", "", length = 256,
-        desc = "Comma-separated list to match (e.g. \"Zombie, Skeleton\") - matched as a case-insensitive substring against whichever Match Mode picks. Leave empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called."
+        desc = "Comma-separated list to match (e.g. \"Zombie, Skeleton\", or a raw texture value in Head Texture mode) - matched as a case-insensitive substring against whichever Match Mode picks. Leave empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called, or which texture id it has in Head Texture mode."
     )
     private val ignoreEntityNames by StringSetting(
         "Ignore Entity Names", "", length = 256,
@@ -174,6 +190,7 @@ object CustomESP : Module(
     private const val ESP_TYPE_OUTLINE = 0
     private const val ESP_TYPE_BOX = 1
     private const val MATCH_MODE_TYPE = 0
+    private const val MATCH_MODE_TEXTURE = 2
 
     /** [scanDistanceInput]'s fallback if the typed text doesn't parse as a number at all. */
     private const val DEFAULT_SCAN_DISTANCE = 64.0
@@ -185,6 +202,9 @@ object CustomESP : Module(
     /** ArmorStands matched via a Name Tag search (see the redirect logic below) - highlighted regardless of [ignoreArmorStandVisual], since these are the actual nametag holder, not a decorative ArmorStand that setting is meant to filter out. Rebuilt every tick alongside [entities]. */
     private val forceVisibleArmorStands = mutableSetOf<Entity>()
     private var debugModeActive = false
+
+    /** Raw skin-texture value -> short sequential display id, in discovery order - see [debugLabelFor]'s own doc. Cleared on world change. */
+    private val discoveredTextures = linkedMapOf<String, Int>()
 
     /** One matched particle's world position, registry name (for the debug-mode label) and when its highlight should disappear - see [particleESP]'s own doc. */
     private data class TrackedParticle(val pos: Vec3, val name: String, val expiresAtMs: Long)
@@ -288,7 +308,7 @@ object CustomESP : Module(
                     val box = entity.renderBoundingBox
                     val labelPos = Vec3((box.minX + box.maxX) / 2.0, box.maxY + 0.3, (box.minZ + box.maxZ) / 2.0)
                     val dist = player?.position()?.distanceTo(labelPos) ?: 0.0
-                    drawText(labelFor(entity), labelPos, labelScale(dist), false)
+                    drawText(debugLabelFor(entity), labelPos, labelScale(dist), false)
                 }
             }
 
@@ -315,6 +335,7 @@ object CustomESP : Module(
         on<WorldEvent.Load> {
             entities.clear()
             trackedParticles.clear()
+            discoveredTextures.clear()
             EntityOutlineESP.clear()
         }
     }
@@ -337,10 +358,41 @@ object CustomESP : Module(
             ?.minByOrNull { it.distanceToSqr(armorStand) }
     }
 
-    /** The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], its current display name/nametag otherwise - used both for matching against [entityNames] and as the debug-mode floating label. */
-    private fun labelFor(entity: Entity): String =
-        if (matchMode == MATCH_MODE_TYPE) entity.type.description.string
-        else entity.name.string.noControlCodes
+    /**
+     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], its equipped head item's raw skin texture
+     * value in [MATCH_MODE_TEXTURE] (empty string if it has no head item, or isn't a [LivingEntity] at all -
+     * matches nothing, same as any other blank search term would), its current display name/nametag
+     * otherwise - this is the value actually compared against [entityNames]/[ignoreEntityNames]. For the
+     * debug-mode floating label specifically, see [debugLabelFor] instead - a raw base64 texture value is
+     * both unreadable and impossible to copy back out of 3D world text, so that path substitutes a short id.
+     */
+    private fun labelFor(entity: Entity): String = when (matchMode) {
+        MATCH_MODE_TYPE -> entity.type.description.string
+        MATCH_MODE_TEXTURE -> (entity as? LivingEntity)?.getItemBySlot(EquipmentSlot.HEAD)?.texture.orEmpty()
+        else -> entity.name.string.noControlCodes
+    }
+
+    /**
+     * The text drawn above an entity in debug mode (see [debugShowNames]) - identical to [labelFor] except in
+     * [MATCH_MODE_TEXTURE], where the real value is a long base64 string that's both unreadable as floating
+     * world text and impossible to copy back out of the game world at all. Instead, each distinct texture
+     * value seen gets a short sequential id ("Texture #1", "Texture #2", ...) - both drawn in-world (readable
+     * from a distance) and printed once to chat together with the FULL raw value the first time it's seen
+     * (copyable from there) via [discoveredTextures], so the workflow is: turn on debug mode with Head
+     * Texture selected, look at whatever should be highlighted, read the matching "Texture #N" off its
+     * floating label, then find that same id in chat and copy the full value into Entity Names.
+     */
+    private fun debugLabelFor(entity: Entity): String {
+        if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
+        val texture = labelFor(entity)
+        if (texture.isBlank()) return "(no head texture)"
+        val index = discoveredTextures.getOrPut(texture) {
+            val next = discoveredTextures.size + 1
+            modMessage("§bCustom ESP debug: Texture #$next -> $texture")
+            next
+        }
+        return "Texture #$index"
+    }
 
     /** [drawText]'s scale for a label [dist] blocks away - auto-scales with distance to stay a roughly constant apparent size (same formula [de.hxp.hxpaddons.features.impl.mining.CrystalHollowsStructureFinder]/[de.hxp.hxpaddons.features.impl.mining.GoldenDragonFinder] already use), times [labelSize] on top as a user-controlled multiplier. */
     private fun labelScale(dist: Double): Float = max(1f, (dist * 0.03).toFloat()) * labelSize.toFloat()
