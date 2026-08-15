@@ -16,6 +16,7 @@ import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
+import de.hxp.hxpaddons.utils.devMessage
 import de.hxp.hxpaddons.utils.disguiseSignals
 import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
@@ -385,19 +386,34 @@ object CustomESP : Module(
      * The text drawn above an entity in debug mode (see [debugShowNames]) - identical to [labelFor] except in
      * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
      * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
-     * "Texture #2", ...) via [discoveredTextures], purely as an in-world label - no longer also printed to
-     * chat (2026-08-16, on request, after the investigation this was built for wrapped up - "er spammt mir
-     * immernoch mein chat voll er muss jetzt nichts mehr loggen"). For the actual full details behind a given
-     * entity now, use `/hxp esp dump` (look at it directly) instead.
+     * "Texture #2", ...) via [discoveredTextures], both drawn in-world and logged once via [devMessage] (only
+     * visible with "Developer Message" on) the first time it's seen - moved off [modMessage]/regular chat
+     * (2026-08-16, on request - originally spammed regular chat during the Odonata investigation ("er spammt
+     * mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then re-added as a dev-only log instead
+     * of removed outright ("mach den dump wieder rein bei developer message") - stays out of the way normally
+     * but is still there to turn on when actually investigating something.
      */
     private fun debugLabelFor(entity: Entity): String {
         if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
         val living = entity as? LivingEntity ?: return "(not a living entity)"
-        val hasEquipment = EquipmentSlot.entries.any { !living.getItemBySlot(it).isEmpty }
-        if (!hasEquipment) return "(no equipped items)"
+        val equipped = EquipmentSlot.entries.mapNotNull { slot ->
+            val stack = living.getItemBySlot(slot)
+            if (stack.isEmpty) null else slot to stack
+        }
+        if (equipped.isEmpty()) return "(no equipped items)"
 
         val combined = labelFor(entity)
-        val index = discoveredTextures.getOrPut(combined) { discoveredTextures.size + 1 }
+        val index = discoveredTextures.getOrPut(combined) {
+            val next = discoveredTextures.size + 1
+            val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
+            val details = equipped.joinToString(" | ") { (slot, stack) ->
+                val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
+                val signals = stack.disguiseSignals
+                "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
+            }
+            devMessage("Custom ESP debug: Texture #$next ($entityInfo) -> $details")
+            next
+        }
         return "Texture #$index"
     }
 
