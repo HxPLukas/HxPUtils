@@ -38,6 +38,7 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 - **Copy Chat** — copy chat messages by clicking on them.
 - **Auto Dialogue** — automatically continues dialogues with NPCs.
 - **Mod ID Hider** — hides your mod list and client brand from servers (on by default).
+- **Name Changer** — replaces your own name with another (in a configurable color) wherever it shows up in chat, the tab list, and your floating name tag. Purely client-side - only you see the replacement.
 - **Smooth World Loading** — skips the terrain loading screen when joining servers or switching dimensions.
 
 ### 🖱️ Commands
