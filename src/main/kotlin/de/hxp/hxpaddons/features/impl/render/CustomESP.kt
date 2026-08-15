@@ -35,6 +35,7 @@ import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
@@ -376,34 +377,38 @@ object CustomESP : Module(
 
     /**
      * Called purely for its side effect when [logTextureDiscovery] is on - assigns each distinct combined
-     * [de.hxp.hxpaddons.utils.disguiseSignals] value seen across an entity's equipped items a short sequential
-     * id ("Texture #1", "Texture #2", ...) via [discoveredTextures] and logs it once via [devMessage] (only
-     * visible with "Developer Message" on) the first time it's seen - moved off [modMessage]/regular chat
-     * (2026-08-16, on request - originally spammed regular chat during the Odonata investigation ("er spammt
-     * mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then re-added as a dev-only log instead
-     * of removed outright ("mach den dump wieder rein bei developer message")) - stays out of the way normally
-     * but is still there to turn on when actually investigating a new disguise/hunting for a Skin/Model ID
-     * value to paste into a Target Profile.
+     * [de.hxp.hxpaddons.utils.disguiseSignals] value seen on an entity (its own fake-player skin plus every
+     * equipped item's signal, see that property's own doc) a short sequential id ("Texture #1", "Texture #2",
+     * ...) via [discoveredTextures] and logs it once via [devMessage] (only visible with "Developer Message" on)
+     * the first time it's seen - moved off [modMessage]/regular chat (2026-08-16, on request - originally
+     * spammed regular chat during the Odonata investigation ("er spammt mir immernoch mein chat voll er muss
+     * jetzt nichts mehr loggen"), then re-added as a dev-only log instead of removed outright ("mach den dump
+     * wieder rein bei developer message")) - stays out of the way normally but is still there to turn on when
+     * actually investigating a new disguise/hunting for a Skin/Model ID value to paste into a Target Profile.
      */
     private fun logDiscoveredTexture(entity: Entity) {
-        val living = entity as? LivingEntity ?: return
-        val equipped = EquipmentSlot.entries.mapNotNull { slot ->
-            val stack = living.getItemBySlot(slot)
-            if (stack.isEmpty) null else slot to stack
-        }
-        if (equipped.isEmpty()) return
-
-        val combined = equipped.flatMap { (_, stack) -> stack.disguiseSignals }.joinToString("|")
-        if (combined.isBlank()) return
-        discoveredTextures.getOrPut(combined) {
+        val combined = entity.disguiseSignals
+        if (combined.isEmpty()) return
+        val key = combined.joinToString("|")
+        discoveredTextures.getOrPut(key) {
             val next = discoveredTextures.size + 1
             val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
-            val details = equipped.joinToString(" | ") { (slot, stack) ->
-                val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
-                val signals = stack.disguiseSignals
-                "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
+            val ownSkin = (entity as? Player)?.gameProfile?.properties?.get("textures")?.firstOrNull()?.value
+            val equipped = (entity as? LivingEntity)?.let { living ->
+                EquipmentSlot.entries.mapNotNull { slot ->
+                    val stack = living.getItemBySlot(slot)
+                    if (stack.isEmpty) null else slot to stack
+                }
+            }.orEmpty()
+            val parts = buildList {
+                if (ownSkin != null) add("own skin=[$ownSkin]")
+                equipped.forEach { (slot, stack) ->
+                    val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
+                    val signals = stack.disguiseSignals
+                    add("$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]")
+                }
             }
-            devMessage("Custom ESP debug: Texture #$next ($entityInfo) -> $details")
+            devMessage("Custom ESP debug: Texture #$next ($entityInfo) -> ${parts.joinToString(" | ")}")
             next
         }
     }
@@ -501,7 +506,7 @@ object CustomESP : Module(
         modMessage("§7Name: §f${closest.name.string.noControlCodes}")
 
         val living = closest as? LivingEntity
-        val skinIds = living?.let { l -> EquipmentSlot.entries.flatMap { l.getItemBySlot(it).disguiseSignals } }.orEmpty()
+        val skinIds = closest.disguiseSignals
         modMessage(if (skinIds.isEmpty()) "§7Skin/Model ID: §f(none found)" else "§7Skin/Model ID: §f${skinIds.joinToString(", ")}")
 
         fun slotDisplay(slot: EquipmentSlot): String {

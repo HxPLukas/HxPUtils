@@ -10,7 +10,10 @@ import net.minecraft.core.component.DataComponents
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.LivingEntity
+import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.ItemStack
 import net.minecraft.world.item.Items
 import net.minecraft.world.item.component.CustomData
@@ -79,6 +82,25 @@ val ItemStack.disguiseSignals: List<String>
         get(DataComponents.ITEM_MODEL)?.let { modelId ->
             if (modelId != BuiltInRegistries.ITEM.getKey(item)) signals.add(modelId.toString())
         }
+        return signals
+    }
+
+/**
+ * Every readable "disguise" signal a whole entity carries - unlike [ItemStack.disguiseSignals] (equipped-item
+ * only), this also covers a mob disguised as its OWN entity rather than via something it's holding/wearing:
+ * a fake [Player]-type entity rendered with a custom [GameProfile] skin (Hypixel's other common disguise
+ * mechanism - e.g. Shadow Assassin, see [de.hxp.hxpaddons.features.impl.dungeon.StarMobESP]'s own
+ * uuid-version-2 check for the same underlying trick), read the same way [texture] reads an item's skull skin.
+ * Added 2026-08-16 on request ("aber mir gehts doch um den mob und nicht das item") after `/hxp esp mob`'s
+ * Skin/Model ID field only ever looked at held/worn items and came back empty for a mob disguised this way.
+ * Falls back to every equipped item's own [ItemStack.disguiseSignals] across all [EquipmentSlot]s either way,
+ * so both disguise mechanisms are covered by one call.
+ */
+val Entity.disguiseSignals: List<String>
+    get() {
+        val signals = mutableListOf<String>()
+        if (this is Player) gameProfile.properties.get("textures").firstOrNull()?.value?.let { signals.add(it) }
+        if (this is LivingEntity) EquipmentSlot.entries.forEach { signals.addAll(getItemBySlot(it).disguiseSignals) }
         return signals
     }
 
