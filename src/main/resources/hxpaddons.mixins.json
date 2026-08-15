@@ -38,6 +38,7 @@
     "mixins.LocalPlayerMixin",
     "mixins.MinecraftMixin",
     "mixins.MouseHandlerMixin",
+    "mixins.PlayerTabOverlayMixin",
     "mixins.ScreenEffectRendererMixin",
     "mixins.ScreenMixin"
   ],
