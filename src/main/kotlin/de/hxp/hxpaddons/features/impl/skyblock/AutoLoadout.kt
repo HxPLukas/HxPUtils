@@ -31,8 +31,8 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
  * multiple clicks is exactly the kind of thing Hypixel silently drops instead of erroring, which looks like
  * "the GUI opened but nothing after that ever happens."
  *
- * Slot layout confirmed live (2026-08-15): loadouts 1-12 sit 3-per-row at slots 15/16/17, 24/25/26, 33/34/35,
- * 42/43/44 (each row +9 from the last). Loadout 13+ needs the "scroll down" button at slot 45 clicked once
+ * Slot layout confirmed live (2026-08-15): loadouts 1-12 sit 3-per-row at slots 14/15/16, 23/24/25, 32/33/34,
+ * 41/42/43 (each row +9 from the last). Loadout 13+ needs the "scroll down" button at slot 45 clicked once
  * first (13-24 then reuse the exact same 1-12 layout); further pages would need another scroll click per 12
  * loadouts, unverified since only up to 24 was confirmed. The GUI's own title isn't confirmed live either, so
  * this doesn't gate on it - it just trusts that whatever screen opens right after `/loadout`, while a loadout
@@ -48,8 +48,12 @@ object AutoLoadout : Module(
     /** Loadouts per page before the "scroll down" button (slot [SCROLL_DOWN_SLOT]) needs clicking once more. */
     private const val LOADOUTS_PER_PAGE = 12
 
-    /** The 3 loadout-slot columns' first row, e.g. loadout 1 (index 0) -> [FIRST_ROW_SLOT] + 0. */
-    private const val FIRST_ROW_SLOT = 15
+    /**
+     * The 3 loadout-slot columns' first row, e.g. loadout 1 (index 0) -> [FIRST_ROW_SLOT] + 0.
+     * Confirmed live (2026-08-15): the initially assumed 15 was off by one - slot 16 actually holds
+     * "Loadout 3", not "Loadout 2", so the real first slot is 14.
+     */
+    private const val FIRST_ROW_SLOT = 14
     private const val COLUMNS_PER_ROW = 3
     private const val SLOTS_PER_ROW_DOWN = 9
     private const val SCROLL_DOWN_SLOT = 45
@@ -159,7 +163,10 @@ object AutoLoadout : Module(
         dumpScreen(afterClick, "After equipping loadout $loadout (slot $slot)")
 
         delay(GUI_UPDATE_SETTLE_MS)
-        mc.setScreen(null)
+        // Must run on the main/render thread - closing off-thread (this whole function runs in a coroutine)
+        // skips Minecraft's normal mouse-grab handling that a real ESC/close does, which is what left the
+        // mouse "stuck" behaving like the GUI was still open.
+        mc.execute { mc.setScreen(null) }
         modMessage("§aAuto Loadout: equipped loadout $loadout.")
     }
 
