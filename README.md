@@ -27,7 +27,7 @@ A Hypixel Skyblock QoL Fabric mod, based on Odin by odtheking (see [`LICENSE`](L
 - **Star Mob ESP** — highlights starred dungeon mobs through walls.
 
 ### 🎨 Render
-- **Custom ESP** — highlights entities (and optionally particles) matching a name/type list through walls.
+- **Custom ESP** — highlights entities (and optionally particles) matching a saved Target Profile (entity type, name, skin/model id, held item, per-armor-slot) through walls.
 - **Zoom** — hold a keybind to reduce FOV, scroll to adjust; optional Smooth Mode (eased zoom transition + smoothed camera turning) and zoom-depth-scaled mouse sensitivity.
 - **Borderless Fullscreen** — replaces Minecraft's exclusive fullscreen with a borderless window (F11).
 
