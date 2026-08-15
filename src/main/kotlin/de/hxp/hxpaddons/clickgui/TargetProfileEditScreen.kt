@@ -19,19 +19,22 @@ import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
-import org.lwjgl.glfw.GLFW
 import de.hxp.hxpaddons.utils.ui.mouseX as odinMouseX
 import de.hxp.hxpaddons.utils.ui.mouseY as odinMouseY
 
 /**
- * The "add a new [TargetProfile]" screen opened by [TargetProfilesScreen]'s Add button (on request -
- * "welche ein neues gui öffnet wo man alle daten angeben kann entity und name hat er ja schon aber wo man
- * auch skin id item held armor und eben alles was man über high range detecten kann angeben kann"): five
- * independent text fields, one per [TargetProfile] property, all optional/wildcard when left blank (per
- * [TargetProfile]'s own matching rules). Save constructs one profile from whatever was filled in and returns
- * to [TargetProfilesScreen]; Cancel/Escape/× discards and returns without saving.
+ * The add/edit screen for one [TargetProfile], opened either from [TargetProfilesScreen]'s Add button (on
+ * request - "welche ein neues gui öffnet wo man alle daten angeben kann entity und name hat er ja schon aber wo
+ * man auch skin id item held armor und eben alles was man über high range detecten kann angeben kann") via
+ * [openForNew], or by right-clicking an existing row (2026-08-16, on request - "per rechts clicken bearbeiten
+ * kann") via [openForEdit] - both share the same form, [editingIndex] just tracks which mode [save] should act
+ * in. Independent text fields, one per [TargetProfile] property (plus [TargetProfile.label], on the same
+ * request - "ihnen namen geben kann"), all optional/wildcard when left blank except Label (per [TargetProfile]'s
+ * own matching rules). Save constructs/updates one profile from whatever was filled in and returns to
+ * [TargetProfilesScreen]; Cancel/× discards and returns without saving - Escape deliberately does NOT (same
+ * request as [TargetProfilesScreen]'s own row rework - "die nurnoch wenn man rechts auf kreuz drückt schließt").
  */
-object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile")) {
+object TargetProfileEditScreen : Screen(Component.literal("Target Profile")) {
 
     private val windowBg = Color(17, 13, 24)
 
@@ -48,9 +51,25 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
 
     private data class Field(val label: String, val placeholder: String, val input: TextInputHandler)
 
-    private val fieldValues = MutableList(8) { "" }
+    // Index 0 is TargetProfile.label (cosmetic, not a matching field - see the class doc) - kept first since
+    // it's the row's own title, everything after it is a matching field in the exact order TargetProfile's
+    // constructor/`/hxp esp mob` use.
+    private val fieldValues = MutableList(9) { "" }
+    private const val IDX_LABEL = 0
+    private const val IDX_ENTITY_TYPE = 1
+    private const val IDX_NAME = 2
+    private const val IDX_SKIN_ID = 3
+    private const val IDX_HELD_ITEM = 4
+    private const val IDX_HELMET = 5
+    private const val IDX_CHESTPLATE = 6
+    private const val IDX_LEGGINGS = 7
+    private const val IDX_BOOTS = 8
+
+    /** null while adding a brand new profile ([openForNew]); the index into [CustomESP.targetProfiles] being edited otherwise ([openForEdit]) - decides whether [save] appends or updates in place. */
+    private var editingIndex: Int? = null
 
     private val fieldLabels = listOf(
+        "Label (optional)" to "your own name for this profile, e.g. \"Iron Golem farmers\"",
         "Entity Type" to "e.g. Zombie",
         "Name" to "e.g. Crypt Ghoul",
         "Skin / Model ID" to "texture, CustomModelData or ItemModel id",
@@ -71,7 +90,24 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
     private val H = TITLE_H + PAD + fields.size * FIELD_H + BOTTOM_H
 
     fun openForNew() {
+        editingIndex = null
         for (i in fieldValues.indices) fieldValues[i] = ""
+        mc.setScreen(this)
+    }
+
+    /** Pre-fills every field from `CustomESP.targetProfiles[index]` and switches [save] into update-in-place mode. */
+    fun openForEdit(index: Int) {
+        val profile = CustomESP.targetProfiles.getOrNull(index) ?: return
+        editingIndex = index
+        fieldValues[IDX_LABEL] = profile.label
+        fieldValues[IDX_ENTITY_TYPE] = profile.entityType
+        fieldValues[IDX_NAME] = profile.name
+        fieldValues[IDX_SKIN_ID] = profile.skinId
+        fieldValues[IDX_HELD_ITEM] = profile.heldItem
+        fieldValues[IDX_HELMET] = profile.helmet
+        fieldValues[IDX_CHESTPLATE] = profile.chestplate
+        fieldValues[IDX_LEGGINGS] = profile.leggings
+        fieldValues[IDX_BOOTS] = profile.boots
         mc.setScreen(this)
     }
 
@@ -100,7 +136,8 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
 
             // ── Title bar ──────────────────────────────────────────
             NVGRenderer.circle(cx + PAD + 4f, cy + TITLE_H / 2f, 4f, accent.rgba)
-            NVGRenderer.text("Add Target Profile", cx + PAD + 16f, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
+            val titleText = if (editingIndex != null) "Edit Target Profile" else "Add Target Profile"
+            NVGRenderer.text(titleText, cx + PAD + 16f, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
 
             val closeHovered = isAreaHovered(cx + W - PAD * 2 - FS_TITLE, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE * 1.2f, FS_TITLE, true)
             NVGRenderer.text("×", cx + W - PAD - FS_TITLE, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE, if (closeHovered) Colors.MINECRAFT_RED.rgba else Colors.WHITE.rgba, NVGRenderer.defaultFont)
@@ -185,8 +222,8 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
         return super.charTyped(characterEvent)
     }
 
+    // Escape deliberately does NOT close this screen (see the class doc) - only Cancel/× (see mouseClicked) do.
     override fun keyPressed(keyEvent: KeyEvent): Boolean {
-        if (keyEvent.key == GLFW.GLFW_KEY_ESCAPE) { cancel(); return true }
         for (field in fields) if (field.input.keyPressed(keyEvent)) return true
         return super.keyPressed(keyEvent)
     }
@@ -198,18 +235,27 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
     override fun isPauseScreen() = false
 
     private fun save() {
+        val editIdx = editingIndex
+        // Preserve the original's `enabled` state when editing (2026-08-16, on request - this form has no
+        // enabled toggle of its own, that's TargetProfilesScreen's row checkbox; a save here shouldn't
+        // silently re-enable a profile the user had deliberately turned off) - a brand new profile always
+        // starts enabled, same as TargetProfile's own default.
+        val wasEnabled = editIdx?.let { CustomESP.targetProfiles.getOrNull(it)?.enabled } ?: true
         val profile = TargetProfile(
-            entityType = fieldValues[0].trim(),
-            name = fieldValues[1].trim(),
-            skinId = fieldValues[2].trim(),
-            heldItem = fieldValues[3].trim(),
-            helmet = fieldValues[4].trim(),
-            chestplate = fieldValues[5].trim(),
-            leggings = fieldValues[6].trim(),
-            boots = fieldValues[7].trim()
+            label = fieldValues[IDX_LABEL].trim(),
+            enabled = wasEnabled,
+            entityType = fieldValues[IDX_ENTITY_TYPE].trim(),
+            name = fieldValues[IDX_NAME].trim(),
+            skinId = fieldValues[IDX_SKIN_ID].trim(),
+            heldItem = fieldValues[IDX_HELD_ITEM].trim(),
+            helmet = fieldValues[IDX_HELMET].trim(),
+            chestplate = fieldValues[IDX_CHESTPLATE].trim(),
+            leggings = fieldValues[IDX_LEGGINGS].trim(),
+            boots = fieldValues[IDX_BOOTS].trim()
         )
         if (!profile.isBlank) {
-            CustomESP.targetProfiles.add(profile)
+            if (editIdx != null && editIdx < CustomESP.targetProfiles.size) CustomESP.targetProfiles[editIdx] = profile
+            else CustomESP.targetProfiles.add(profile)
             ModuleManager.saveConfigurations()
         }
         mc.setScreen(TargetProfilesScreen)

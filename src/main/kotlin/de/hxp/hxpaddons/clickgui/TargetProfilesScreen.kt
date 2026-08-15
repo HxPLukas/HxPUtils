@@ -18,7 +18,6 @@ import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
-import org.lwjgl.glfw.GLFW
 import de.hxp.hxpaddons.utils.ui.mouseX as odinMouseX
 import de.hxp.hxpaddons.utils.ui.mouseY as odinMouseY
 
@@ -30,21 +29,33 @@ import de.hxp.hxpaddons.utils.ui.mouseY as odinMouseY
  * is just a single "Add" button (on request - "rechts einen add button hat welche ein neues gui öffnet") that
  * opens [TargetProfileEditScreen] instead of a text-input-and-Add pair, since a profile needs several fields
  * filled in, not one string.
+ *
+ * Row interactions (2026-08-16, on request - "das man filter an und aus togglen kann ihnen namen geben kann
+ * per rechts clicken bearbeiten kann"): a checkbox on the left of each row toggles
+ * [de.hxp.hxpaddons.features.impl.render.TargetProfile.enabled] without deleting/retyping it; right-clicking
+ * anywhere on a row opens [TargetProfileEditScreen] pre-filled with that profile (including its
+ * [de.hxp.hxpaddons.features.impl.render.TargetProfile.label]) for editing in place; the × on the right still
+ * deletes - narrowed from "anywhere on the row deletes it" (the original behavior) down to just that button's
+ * own hitbox now that the rest of the row does other things. Same request also removed Escape as a way to
+ * close this screen (and [TargetProfileEditScreen]) - only clicking the × now does, on request ("die nurnoch
+ * wenn man rechts auf kreuz drückt schließt").
  */
 object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
 
     private val windowBg = Color(17, 13, 24)
 
     private const val W        = 640f
-    private const val H        = 540f
-    private const val TITLE_H  = 42f
+    private const val H        = 552f
+    private const val TITLE_H  = 54f
     private const val SEARCH_H = 48f
     private const val BOTTOM_H = 64f
     private const val ROW_H    = 36f
     private const val PAD      = 10f
     private const val FS       = 15f
     private const val FS_TITLE = 20f
+    private const val FS_HINT  = 11f
     private const val BTN_ADD  = 100f
+    private const val CB_SIZE  = FS
     private const val LIST_H   = H - TITLE_H - SEARCH_H - BOTTOM_H
 
     private var scrollOffset = 0f
@@ -93,11 +104,12 @@ object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
             NVGRenderer.hollowRect(cx, cy, W, H, 1.5f, accent.withAlpha(0.35f).rgba, radius)
 
             // ── Title bar ──────────────────────────────────────────
-            NVGRenderer.circle(cx + PAD + 4f, cy + TITLE_H / 2f, 4f, accent.rgba)
-            NVGRenderer.text("Target Profiles", cx + PAD + 16f, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
+            NVGRenderer.circle(cx + PAD + 4f, cy + 20f, 4f, accent.rgba)
+            NVGRenderer.text("Target Profiles", cx + PAD + 16f, cy + 20f - FS_TITLE / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
+            NVGRenderer.text("Checkbox toggles • Right-click edits • × deletes", cx + PAD + 16f, cy + 20f + FS_TITLE / 2f, FS_HINT, Colors.MINECRAFT_DARK_GRAY.rgba, NVGRenderer.defaultFont)
 
-            val closeHovered = isAreaHovered(cx + W - PAD * 2 - FS_TITLE, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE * 1.2f, FS_TITLE, true)
-            NVGRenderer.text("×", cx + W - PAD - FS_TITLE, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE, if (closeHovered) Colors.MINECRAFT_RED.rgba else Colors.WHITE.rgba, NVGRenderer.defaultFont)
+            val closeHovered = isAreaHovered(cx + W - PAD * 2 - FS_TITLE, cy + 20f - FS_TITLE / 2f, FS_TITLE * 1.2f, FS_TITLE, true)
+            NVGRenderer.text("×", cx + W - PAD - FS_TITLE, cy + 20f - FS_TITLE / 2f, FS_TITLE, if (closeHovered) Colors.MINECRAFT_RED.rgba else Colors.WHITE.rgba, NVGRenderer.defaultFont)
 
             NVGRenderer.line(cx, cy + TITLE_H, cx + W, cy + TITLE_H, 1f, Colors.gray38.rgba)
 
@@ -122,26 +134,38 @@ object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
                 val msgW = NVGRenderer.textWidth(msg, FS, NVGRenderer.defaultFont)
                 NVGRenderer.text(msg, cx + (W - msgW) / 2f, listStartY + (LIST_H - FS) / 2f, FS, Colors.MINECRAFT_DARK_GRAY.rgba, NVGRenderer.defaultFont)
             } else {
-                displayed.forEachIndexed { rowIdx, (_, summary) ->
+                displayed.forEachIndexed { rowIdx, (origIdx, summary) ->
                     val ry = listStartY + rowIdx * ROW_H - scrollOffset
                     if (ry + ROW_H < listStartY || ry > listStartY + LIST_H) return@forEachIndexed
 
                     val riY = ry + 2f;  val riH = ROW_H - 4f
                     val rowHovered = isAreaHovered(cx + PAD, riY, W - PAD * 2, riH, true)
                             && smy >= listStartY && smy <= listStartY + LIST_H
+                    val profile = CustomESP.targetProfiles[origIdx]
 
                     NVGRenderer.rect(cx + PAD, riY, W - PAD * 2, riH, Colors.controlBg.rgba, 5f)
                     if (rowHovered) NVGRenderer.hollowRect(cx + PAD, riY, W - PAD * 2, riH, 1.5f, accent.withAlpha(0.45f).rgba, 5f)
 
+                    val cbX = cx + PAD + 6f
+                    val cbY = riY + (riH - CB_SIZE) / 2f
+                    if (profile.enabled) {
+                        NVGRenderer.rect(cbX, cbY, CB_SIZE, CB_SIZE, accent.rgba, 3f)
+                    } else {
+                        val cbHovered = isAreaHovered(cbX, cbY, CB_SIZE, CB_SIZE, true)
+                        NVGRenderer.hollowRect(cbX, cbY, CB_SIZE, CB_SIZE, 1.5f, (if (cbHovered) accent else Colors.MINECRAFT_DARK_GRAY).withAlpha(0.7f).rgba, 3f)
+                    }
+
                     val xBtnW = FS * 1.4f
                     val xBtnX = cx + W - PAD - xBtnW
+                    val xHovered = isAreaHovered(xBtnX, riY, xBtnW, riH, true)
                     val tvCenter = riY + (riH - FS) / 2f
 
                     NVGRenderer.text("×", xBtnX + (xBtnW - NVGRenderer.textWidth("×", FS, NVGRenderer.defaultFont)) / 2f,
-                        tvCenter, FS, if (rowHovered) Colors.MINECRAFT_RED.rgba else Colors.MINECRAFT_DARK_GRAY.rgba, NVGRenderer.defaultFont)
+                        tvCenter, FS, if (xHovered) Colors.MINECRAFT_RED.rgba else Colors.MINECRAFT_DARK_GRAY.rgba, NVGRenderer.defaultFont)
 
-                    val display = truncate(summary, W - PAD * 3 - xBtnW - PAD)
-                    NVGRenderer.text(display, cx + PAD * 2, tvCenter, FS, Colors.WHITE.rgba, NVGRenderer.defaultFont)
+                    val textX = cbX + CB_SIZE + 10f
+                    val display = truncate(summary, xBtnX - PAD - textX)
+                    NVGRenderer.text(display, textX, tvCenter, FS, if (profile.enabled) Colors.WHITE.rgba else Colors.MINECRAFT_DARK_GRAY.rgba, NVGRenderer.defaultFont)
                 }
             }
             NVGRenderer.popScissor()
@@ -181,7 +205,7 @@ object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
         val cx = (mc.window.screenWidth / guiScale - W) / 2f
         val cy = (mc.window.screenHeight / guiScale - H) / 2f
 
-        if (mouseButtonEvent.button() == 0 && isAreaHovered(cx + W - PAD * 2 - FS_TITLE, cy + (TITLE_H - FS_TITLE) / 2f, FS_TITLE * 1.2f, FS_TITLE, true)) {
+        if (mouseButtonEvent.button() == 0 && isAreaHovered(cx + W - PAD * 2 - FS_TITLE, cy + 20f - FS_TITLE / 2f, FS_TITLE * 1.2f, FS_TITLE, true)) {
             onClose(); return true
         }
 
@@ -197,14 +221,33 @@ object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
         }
 
         val listStartY = cy + TITLE_H + SEARCH_H
-        if (mouseButtonEvent.button() == 0 && smy >= listStartY && smy <= listStartY + LIST_H) {
+        if (smy >= listStartY && smy <= listStartY + LIST_H) {
             displayedProfiles.forEachIndexed { rowIdx, (origIdx, _) ->
                 val ry = listStartY + rowIdx * ROW_H - scrollOffset
-                if (isAreaHovered(cx + PAD, ry + 2f, W - PAD * 2, ROW_H - 4f, true)) {
-                    CustomESP.targetProfiles.removeAt(origIdx)
-                    ModuleManager.saveConfigurations()
-                    scrollOffset = scrollOffset.coerceIn(0f, (CustomESP.targetProfiles.size * ROW_H - LIST_H).coerceAtLeast(0f))
+                val riY = ry + 2f;  val riH = ROW_H - 4f
+                if (!isAreaHovered(cx + PAD, riY, W - PAD * 2, riH, true)) return@forEachIndexed
+
+                if (mouseButtonEvent.button() == 1) {
+                    TargetProfileEditScreen.openForEdit(origIdx)
                     return true
+                }
+                if (mouseButtonEvent.button() == 0) {
+                    val cbX = cx + PAD + 6f
+                    val cbY = riY + (riH - CB_SIZE) / 2f
+                    if (isAreaHovered(cbX, cbY, CB_SIZE, CB_SIZE, true)) {
+                        val profile = CustomESP.targetProfiles[origIdx]
+                        profile.enabled = !profile.enabled
+                        ModuleManager.saveConfigurations()
+                        return true
+                    }
+                    val xBtnW = FS * 1.4f
+                    val xBtnX = cx + W - PAD - xBtnW
+                    if (isAreaHovered(xBtnX, riY, xBtnW, riH, true)) {
+                        CustomESP.targetProfiles.removeAt(origIdx)
+                        ModuleManager.saveConfigurations()
+                        scrollOffset = scrollOffset.coerceIn(0f, (CustomESP.targetProfiles.size * ROW_H - LIST_H).coerceAtLeast(0f))
+                        return true
+                    }
                 }
             }
         }
@@ -222,8 +265,9 @@ object TargetProfilesScreen : Screen(Component.literal("Target Profiles")) {
         return super.charTyped(characterEvent)
     }
 
+    // Escape deliberately does NOT close this screen (2026-08-16, on request - "die nurnoch wenn man rechts
+    // auf kreuz drückt schließt") - only the × button (see mouseClicked) does now.
     override fun keyPressed(keyEvent: KeyEvent): Boolean {
-        if (keyEvent.key == GLFW.GLFW_KEY_ESCAPE) { onClose(); return true }
         if (searchInput.keyPressed(keyEvent)) return true
         return super.keyPressed(keyEvent)
     }

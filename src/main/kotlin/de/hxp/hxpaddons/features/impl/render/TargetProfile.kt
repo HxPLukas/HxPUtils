@@ -19,12 +19,22 @@ import net.minecraft.world.entity.LivingEntity
  * findet"). An entity matches [CustomESP]'s target-profile system as a whole if it satisfies ANY one profile
  * in the list ("oder" across profiles) - see [CustomESP.matchesAnyProfile].
  *
- * All fields are matched the same way: case-insensitive substring, exactly like every other text match in
- * this module. Armor started as one combined field matched against any of the 4 armor slots, split into one
- * field per slot (2026-08-16, on request - "unterteile armor bitte in alle 4 pieces einzeln") so a profile can
- * pin down e.g. specifically the boots instead of "any armor piece contains X".
+ * All matching fields are compared the same way: case-insensitive substring, exactly like every other text
+ * match in this module. Armor started as one combined field matched against any of the 4 armor slots, split
+ * into one field per slot (2026-08-16, on request - "unterteile armor bitte in alle 4 pieces einzeln") so a
+ * profile can pin down e.g. specifically the boots instead of "any armor piece contains X".
+ *
+ * [label]/[enabled] (2026-08-16, on request - "das man filter an und aus togglen kann [und] ihnen namen geben
+ * kann") are management-only, not matching fields: [label] is purely a user-chosen display name for the
+ * profile list row (distinct from [name], which still matches the ENTITY's own nametag) - falls back to
+ * [summary] when left blank. [enabled] lets a saved profile be temporarily excluded from matching without
+ * deleting/retyping it - see the early return in [matches].
  */
 data class TargetProfile(
+    /** User-chosen display label for this profile's row in [de.hxp.hxpaddons.clickgui.TargetProfilesScreen] - purely cosmetic, falls back to [summary] when blank. NOT a matching field, unlike every property below. */
+    var label: String = "",
+    /** Whether this profile currently takes part in matching at all - toggled from the profile list without needing to delete/retype it. */
+    var enabled: Boolean = true,
     /** Matched against [Entity.getType]'s translated description, e.g. "Zombie". */
     var entityType: String = "",
     /** Matched against the entity's current display name/nametag - same field [CustomESP]'s own Name Tag mode reads. */
@@ -45,8 +55,8 @@ data class TargetProfile(
     val isBlank: Boolean get() = entityType.isBlank() && name.isBlank() && skinId.isBlank() && heldItem.isBlank() &&
         helmet.isBlank() && chestplate.isBlank() && leggings.isBlank() && boots.isBlank()
 
-    /** Short one-line description for the profile list row - only the fields actually filled in. */
-    fun summary(): String {
+    /** Auto-generated one-line description of only the match fields actually filled in - ignores [label]/[enabled] entirely, see [summary] for the label-aware display version used in the profile list row. */
+    fun autoSummary(): String {
         val parts = buildList {
             if (entityType.isNotBlank()) add("Type: $entityType")
             if (name.isNotBlank()) add("Name: $name")
@@ -60,8 +70,12 @@ data class TargetProfile(
         return if (parts.isEmpty()) "(empty profile)" else parts.joinToString(" | ")
     }
 
-    /** Whether [entity] satisfies every one of this profile's non-blank fields. */
+    /** Display text for the profile list row - [label] (if the user gave this profile one) followed by [autoSummary], or just [autoSummary] alone otherwise. */
+    fun summary(): String = if (label.isNotBlank()) "$label — ${autoSummary()}" else autoSummary()
+
+    /** Whether [entity] satisfies every one of this profile's non-blank fields - always false while [enabled] is off. */
     fun matches(entity: Entity): Boolean {
+        if (!enabled) return false
         if (entityType.isNotBlank() && !entity.type.description.string.contains(entityType, ignoreCase = true)) return false
         if (name.isNotBlank() && !entity.name.string.noControlCodes.contains(name, ignoreCase = true)) return false
 
