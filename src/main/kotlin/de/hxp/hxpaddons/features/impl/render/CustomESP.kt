@@ -100,6 +100,13 @@ import kotlin.math.max
  * an ArmorStand's name can be shown without boxing it, or vice versa. Both default on (same net default
  * behavior the single old toggle had). Deliberately entity-side only - doesn't affect [particleESP] at all.
  *
+ * Name Tag mode + ArmorStand-held mob names (2026-08-15, bugfix): a matched ArmorStand's highlight now also
+ * resolves to the real mob entity standing directly beneath it (same technique [StarMobESP] already uses) -
+ * previously a match against the ArmorStand's name (which is where dungeon-style mobs like "Crypt Ghoul"
+ * actually carry their display name, not the mob entity itself) got silently dropped by
+ * [ignoreArmorStandVisual] (on by default) before ever reaching the render pass, making the match look like
+ * it never fired.
+ *
  * Entirely unverified live - first time this exact matching+labeling combination gets exercised.
  */
 object CustomESP : Module(
@@ -208,6 +215,20 @@ object CustomESP : Module(
                 if (ignoreNames.any { name -> label.contains(name, ignoreCase = true) }) return@forEach
                 if (debugModeActive || names.any { name -> label.contains(name, ignoreCase = true) }) {
                     entities.add(e)
+                    // Dungeon-style mobs (e.g. "Crypt Ghoul") carry their real display name on a separate
+                    // invisible ArmorStand riding just above them, not on the mob entity itself - same
+                    // pattern StarMobESP's own doc explains. Without this, a Name Tag match against that
+                    // ArmorStand only ever highlighted the ArmorStand, which "Ignore Armor Stands
+                    // (Box/Outline)" (on by default) then silently excluded at render time, making the
+                    // match look like it never fired at all - on request, after exactly that symptom got
+                    // reported ("er markiert mir garnichts mehr ... sobald ich irgendwas eingebe"). Also
+                    // registers the real mob standing directly beneath the matched ArmorStand so IT gets
+                    // the box/outline; the ArmorStand itself stays in the set too, purely so its name still
+                    // shows correctly in the debug-mode label instead of the mob's own generic name.
+                    if (matchMode != MATCH_MODE_TYPE && e is ArmorStand) {
+                        mc.level?.getEntities(e, e.boundingBox.move(0.0, -1.0, 0.0)) { it !is ArmorStand && it.isAlive }
+                            ?.firstOrNull()?.let { entities.add(it) }
+                    }
                 }
             }
         }
