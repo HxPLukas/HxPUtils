@@ -39,6 +39,7 @@ object PestESP : Module(
     private val outlineOpacity by NumberSetting("Outline Opacity", 100, 0, 100, 1, unit = "%", desc = "Opacity of the glowing outline.").withDependency { espType == ESP_TYPE_OUTLINE }
     private val boxOutlineWidth by NumberSetting("Box Outline Width", 3, 0, 10, 1, desc = "Width of the box's outline.").withDependency { espType == ESP_TYPE_BOX }
     private val boxOpacity by NumberSetting("Box Opacity", 50, 0, 100, 1, unit = "%", desc = "Opacity of the box's fill.").withDependency { espType == ESP_TYPE_BOX }
+    private val boxHeightScale by NumberSetting("Box Height Scale", 100, 100, 500, 5, unit = "%", desc = "Stretches the box taller than the actual Silverfish - scales up from the bottom (its feet stay planted on the ground), the extra height is added on top only.").withDependency { espType == ESP_TYPE_BOX }
     private val pestColor by ColorSetting("Pest Color", Colors.MINECRAFT_GREEN, true, desc = "The color pests are highlighted in.")
     private val scanDistanceInput by StringSetting("Scan Distance", "64", length = 10, desc = "Maximum distance (in blocks) a pest can be from you to get matched/highlighted - type any number, no fixed upper limit.")
 
@@ -83,7 +84,7 @@ object PestESP : Module(
             entities.forEach { entity ->
                 if (!entity.isAlive) return@forEach
                 if (espType == ESP_TYPE_OUTLINE) EntityOutlineESP.set(entity, pestColor.multiplyAlpha(outlineOpacity / 100f).rgba)
-                else drawPestBox(entity.renderBoundingBox)
+                else drawPestBox(stretchedUpward(entity.renderBoundingBox))
             }
         }
 
@@ -91,6 +92,13 @@ object PestESP : Module(
             entities.clear()
             EntityOutlineESP.clear()
         }
+    }
+
+    /** [boxHeightScale] applied to [aabb] - minY (the Silverfish's feet) stays put, only maxY moves up. */
+    private fun stretchedUpward(aabb: AABB): AABB {
+        if (boxHeightScale == 100) return aabb
+        val newHeight = (aabb.maxY - aabb.minY) * (boxHeightScale / 100.0)
+        return AABB(aabb.minX, aabb.minY, aabb.minZ, aabb.maxX, aabb.minY + newHeight, aabb.maxZ)
     }
 
     private fun RenderEvent.Extract.drawPestBox(aabb: AABB) {
