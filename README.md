@@ -20,6 +20,7 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 
 ### 🏝️ Skyblock
 - **Auto Fish** — reels in and recasts automatically when a fish bites.
+- **Auto Loadout** — equips a loadout by number via `/hxp loadout <n>`.
 - **Term AC** — automatically left-click spams while holding right click with a Terminator bow.
 - **Terminator** — detects the ultimate enchantment on a Terminator bow.
 
@@ -45,5 +46,6 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 - `/hxp recipe <item>` — looks up an item's crafting recipe.
 - `/hxp craftflip` — scans the Bazaar for profitable craft flips.
 - `/hxp fish [stop]` — toggles Auto Fish.
+- `/hxp loadout <n>` — equips loadout n via /loadout.
 - `/hxp garden reset` — resets the Phantom Leaf Solver.
 - `/hxp wip` — toggles WIP modules in the Click GUI.
