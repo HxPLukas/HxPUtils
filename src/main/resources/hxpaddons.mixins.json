@@ -1,0 +1,51 @@
+﻿{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.hxp.hxpaddons.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "client": [
+    "accessors.AbstractContainerScreenAccessor",
+    "accessors.AbstractSignEditScreenAccessor",
+    "accessors.GuiGraphicsExtractorAccessor",
+    "accessors.ClientLevelAccessor",
+    "accessors.LanguageAccessor",
+    "accessors.LanguageManagerAccessor",
+    "accessors.WindowAccessor",
+    "accessors.BeaconBeamAccessor",
+    "accessors.ChatComponentAccessor",
+    "accessors.LocalPlayerAccessor",
+    "mixins.AbstractContainerScreenMixin",
+    "mixins.AnvilMenuMixin",
+    "mixins.AnvilScreenMixin",
+    "mixins.BorderlessFullscreenMixin",
+    "mixins.ClientBrandRetrieverMixin",
+    "mixins.GuiGraphicsMixin",
+    "mixins.AvatarRendererMixin",
+    "mixins.BossBarHealthOverlayMixin",
+    "mixins.ChatListenerMixin",
+    "mixins.ChatScreenMixin",
+    "mixins.ClientPacketListenerMixin",
+    "mixins.ClientPacketListenerMixin_SmoothWorldLoading",
+    "mixins.EntityRendererMixin",
+    "mixins.ExperienceBarRendererMixin",
+    "mixins.FontMixin",
+    "mixins.GuiMixin",
+    "mixins.KeyBindingMixin",
+    "mixins.KeyboardHandlerMixin",
+    "mixins.LocalPlayerMixin",
+    "mixins.MinecraftMixin",
+    "mixins.MouseHandlerMixin",
+    "mixins.ScreenEffectRendererMixin",
+    "mixins.ScreenMixin"
+  ],
+  "mixins": [
+    "accessors.ServerboundInteractPacketAccessor",
+    "mixins.ConnectionMixin",
+    "mixins.EntityMixin",
+    "mixins.LevelChunkMixin",
+    "mixins.YggdrasilSignatureIgnoreMixin"
+  ]
+}

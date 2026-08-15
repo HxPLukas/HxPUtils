@@ -1,0 +1,28 @@
+﻿package de.hxp.hxpaddons.events
+
+import de.hxp.hxpaddons.events.core.CancellableEvent
+import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.input.KeyEvent
+import net.minecraft.client.input.MouseButtonEvent
+
+abstract class ScreenEvent(val screen: Screen) : CancellableEvent() {
+
+    class Open(screen: Screen) : ScreenEvent(screen)
+
+    class Close(screen: Screen) : ScreenEvent(screen)
+
+    class MouseClick(screen: Screen, val click: MouseButtonEvent) : ScreenEvent(screen)
+
+    class MouseRelease(screen: Screen, val click: MouseButtonEvent) : ScreenEvent(screen)
+
+    class KeyPress(screen: Screen, val input: KeyEvent) : ScreenEvent(screen)
+
+    class Render(screen: Screen, val guiGraphics: GuiGraphicsExtractor, val mouseX: Int, val mouseY: Int) : ScreenEvent(screen)
+
+    class CharTyped(screen: Screen, val char: String) : ScreenEvent(screen)
+
+    class MouseScroll(screen: Screen, val mouseX: Double, val mouseY: Double, val deltaX: Double, val deltaY: Double) : ScreenEvent(screen)
+
+    class RenderPost(screen: Screen, val guiGraphics: GuiGraphicsExtractor, val mouseX: Int, val mouseY: Int) : ScreenEvent(screen)
+}
