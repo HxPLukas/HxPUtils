@@ -73,6 +73,7 @@ object AutoLoadout : Module(
             pendingLoadout = null
 
             dumpScreen(containerScreen, "Opened for /hxp loadout $loadout")
+            logLoadoutOneSlot(containerScreen)
             job = HxPMod.scope.launch {
                 runCatching {
                     delay(600L)
@@ -177,6 +178,25 @@ object AutoLoadout : Module(
         }
         devMessage("[AutoLoadout] waitForGuiUpdate timed out after ${timeoutMs}ms - screen at timeout: $described.")
         return null
+    }
+
+    /**
+     * Temporary diagnostic (on request, printed to regular chat instead of Dev Messages so it's visible
+     * without extra setup): finds whichever top slot's item name contains "loadout 1" and reports its slot
+     * index, so [FIRST_ROW_SLOT] (currently assumed 15) can be checked against what's actually there.
+     */
+    private fun logLoadoutOneSlot(screen: AbstractContainerScreen<*>) {
+        val top = screen.topSlotCount()
+        for (i in 0 until top) {
+            val stack = screen.menu.items.getOrNull(i) ?: continue
+            if (stack.isEmpty) continue
+            val name = stack.hoverName.string.noControlCodes
+            if (name.contains("loadout 1", ignoreCase = true)) {
+                modMessage("§bAuto Loadout debug: found \"$name\" at slot #$i (assumed $FIRST_ROW_SLOT).")
+                return
+            }
+        }
+        modMessage("§cAuto Loadout debug: no item containing \"loadout 1\" found in this GUI's top $top slot(s).")
     }
 
     private fun dumpScreen(screen: AbstractContainerScreen<*>, label: String) {
