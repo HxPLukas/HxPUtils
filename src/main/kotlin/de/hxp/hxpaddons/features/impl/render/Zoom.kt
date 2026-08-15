@@ -13,11 +13,16 @@ import kotlin.math.sign
 
 /**
  * Hold [zoomKey] to reduce FOV, release to instantly go back to normal - e.g. to double-check an ESP box is
- * actually sitting on the right entity from a distance without needing to physically walk closer. Not the
- * usual press-to-toggle keybind every other module's [key][Module.key] uses (see [de.hxp.hxpaddons.events.InputEvent],
- * fired once on press only, no release signal) - [zoomKey] is its own explicit [KeybindSetting] (same idea as
- * [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s `combatKey`/`rodKey`) polled every tick via [isDown]
- * instead, so holding/releasing can actually be told apart.
+ * actually sitting on the right entity from a distance without needing to physically walk closer.
+ * `key = null` + `toggled = true` deliberately suppresses the generic auto-registered "Keybind" row every
+ * other module gets from [Module.key] (a plain press-to-toggle of [enabled], see [de.hxp.hxpaddons.events.InputEvent] -
+ * fired once on press only, no release signal, so it can't express "held") and starts the module enabled by
+ * default - after a report of exactly this confusion ("das mit dem keybind war falsch ich kann das feature
+ * enablen und disablen aber nicht zoomen": the generic toggle row got bound instead of [zoomKey], which only
+ * flips [enabled] and has nothing to do with actually zooming). [zoomKey] is Zoom's own explicit
+ * [KeybindSetting] instead (same idea as [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s
+ * `combatKey`/`rodKey`), polled every tick via [isDown] so holding/releasing can actually be told apart - and
+ * now the only bind shown for this module at all.
  *
  * Overrides [net.minecraft.client.Camera]'s own per-frame FOV computation directly (see
  * [de.hxp.hxpaddons.mixin.mixins.CameraMixin], injecting `calculateFov`'s return value) rather than driving
@@ -36,8 +41,10 @@ import kotlin.math.sign
  */
 object Zoom : Module(
     name = "Zoom",
+    key = null,
     description = "Hold the Zoom Key to reduce FOV; scroll while held to zoom further in/out. Release to instantly go back to normal.",
-    category = Category.RENDER
+    category = Category.RENDER,
+    toggled = true
 ) {
     private val zoomKey by KeybindSetting("Zoom Key", GLFW.GLFW_KEY_UNKNOWN, desc = "Hold to zoom in, release to zoom back out.")
     private val startFov by NumberSetting("Start FOV", 20.0, 0.1, 90.0, 0.5, desc = "FOV as soon as the key is pressed, before any scrolling.")
