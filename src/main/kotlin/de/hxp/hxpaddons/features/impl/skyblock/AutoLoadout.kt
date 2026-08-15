@@ -18,7 +18,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen
 
 /**
  * Equips a loadout by number via `/hxp loadout <n>`: runs `/loadout`, waits for the server's screen to open,
- * settles 600ms, scrolls if needed, clicks the target slot, waits 200ms, then closes - no confirmation wait
+ * settles 450ms, scrolls if needed, clicks the target slot, waits 200ms, then closes - no confirmation wait
  * on the final click, it just closes after the delay.
  *
  * Slot layout confirmed live (2026-08-15): loadouts 1-12 sit 3-per-row at slots 14/15/16, 23/24/25, 32/33/34,
@@ -60,7 +60,7 @@ object AutoLoadout : Module(
 
             job = HxPMod.scope.launch {
                 runCatching {
-                    delay(600L)
+                    delay(450L)
                     equipLoadout(loadout)
                 }.onFailure {
                     HxPMod.logger.error("AutoLoadout failed", it)
