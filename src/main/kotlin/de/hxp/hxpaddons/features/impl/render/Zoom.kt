@@ -1,6 +1,7 @@
 package de.hxp.hxpaddons.features.impl.render
 
 import de.hxp.hxpaddons.HxPMod.mc
+import de.hxp.hxpaddons.clickgui.settings.AlwaysActive
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting.Companion.isDown
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
@@ -47,7 +48,15 @@ import kotlin.math.sign
  * up to zoom in further, down to zoom back out, clamped between [minFov] and [startFov]. Only intercepts
  * scroll while actually zoomed and no screen is open, so inventories/chat/the Click GUI keep scrolling
  * normally, same as when the key isn't held at all.
+ *
+ * [AlwaysActive] is required here, not optional: `toggled = true` only sets [Module.enabled]'s *initial
+ * value* - it does not itself subscribe this module to the event bus, which normally only happens through an
+ * actual [Module.toggle] transition (see [Module.onEnable]). Without [AlwaysActive], the `on<TickEvent.End>`
+ * listener below would simply never fire despite `enabled` already reading `true` from the start - silently
+ * starving [zoomKey]'s poll of any tick to run on at all, which is exactly what happened before this fix
+ * ("es passiert nichts wenn ich den keybind drücke").
  */
+@AlwaysActive
 object Zoom : Module(
     name = "Zoom",
     key = null,
