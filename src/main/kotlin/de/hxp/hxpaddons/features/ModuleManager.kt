@@ -26,6 +26,7 @@ import de.hxp.hxpaddons.features.impl.dungeon.StarMobESP
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
 import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
 import de.hxp.hxpaddons.features.impl.skyblock.Combat
+import de.hxp.hxpaddons.features.impl.skyblock.OdonataESP
 import de.hxp.hxpaddons.features.impl.skyblock.TermAutoClicker
 import de.hxp.hxpaddons.features.impl.skyblock.Terminator
 import de.hxp.hxpaddons.features.impl.general.AutoDialogue
@@ -102,6 +103,7 @@ object ModuleManager {
             TermAutoClicker,
             AutoFish,
             Combat,
+            OdonataESP,
             AutoLoadout,
             SecretTriggerbot,
             AutoCloseChest,

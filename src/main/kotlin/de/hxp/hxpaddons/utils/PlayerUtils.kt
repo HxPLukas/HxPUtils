@@ -61,21 +61,29 @@ fun getPositionString(): String {
 private val purseRegex = Regex("purse:\\s*([\\d,]*\\.?\\d+)", RegexOption.IGNORE_CASE)
 
 /**
- * Reads the player's current coin balance off the Skyblock sidebar scoreboard's "Purse: X" line -
- * Hypixel renders sidebar lines via a team prefix/suffix wrapped around a (usually blank) fake score
- * holder name rather than the line's real text living in the holder name itself, same as
- * NoammAddons/reference mods' own scoreboard readers do it. Returns null if not in Skyblock, no sidebar
- * is shown, or the "Purse" line isn't found/parseable (e.g. while some other scoreboard is displayed) -
- * callers should treat that as "unknown" rather than "zero coins".
+ * Reads every currently-visible sidebar scoreboard line as plain text (control codes stripped) - Hypixel
+ * renders sidebar lines via a team prefix/suffix wrapped around a (usually blank) fake score holder name
+ * rather than the line's real text living in the holder name itself, same as NoammAddons/reference mods'
+ * own scoreboard readers do it. Returns an empty list if not in Skyblock or no sidebar is currently shown.
  */
-fun readPurseBalance(): Double? {
-    val scoreboard = mc.level?.scoreboard ?: return null
-    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return null
-    for (score in scoreboard.listPlayerScores(objective)) {
+fun readSidebarLines(): List<String> {
+    val scoreboard = mc.level?.scoreboard ?: return emptyList()
+    val objective = scoreboard.getDisplayObjective(DisplaySlot.SIDEBAR) ?: return emptyList()
+    return scoreboard.listPlayerScores(objective).map { score ->
         val name = score.ownerName().string
         val team = scoreboard.getPlayersTeam(name)
-        val line = (if (team != null) PlayerTeam.formatNameForTeam(team, Component.literal(name)) else Component.literal(name))
+        (if (team != null) PlayerTeam.formatNameForTeam(team, Component.literal(name)) else Component.literal(name))
             .string.noControlCodes
+    }
+}
+
+/**
+ * Reads the player's current coin balance off the Skyblock sidebar scoreboard's "Purse: X" line. Returns
+ * null if the sidebar is empty or the "Purse" line isn't found/parseable (e.g. while some other scoreboard
+ * is displayed) - callers should treat that as "unknown" rather than "zero coins".
+ */
+fun readPurseBalance(): Double? {
+    for (line in readSidebarLines()) {
         val match = purseRegex.find(line) ?: continue
         return match.groupValues[1].replace(",", "").toDoubleOrNull()
     }
