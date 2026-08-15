@@ -1,6 +1,7 @@
 package de.hxp.hxpaddons.features.impl.dungeon
 
 import de.hxp.hxpaddons.HxPMod.mc
+import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
 import de.hxp.hxpaddons.events.TerminalEvent
 import de.hxp.hxpaddons.events.TickEvent
@@ -24,6 +25,7 @@ import org.lwjgl.glfw.GLFW
  * On the Rubix terminal, slots showing a negative correction (-1/-2) are right clicked instead,
  * matching [de.hxp.hxpaddons.utils.skyblock.dungeon.terminals.terminalhandler.RubixHandler]'s button semantics.
  */
+@WipModule
 object TerminalTriggerbot : Module(
     name = "Terminal Triggerbot",
     description = "Middle clicks a terminal slot as soon as your cursor hovers over one the solver knows is correct.",

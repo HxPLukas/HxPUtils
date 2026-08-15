@@ -1,6 +1,7 @@
 package de.hxp.hxpaddons.features.impl.dungeon
 
 import de.hxp.hxpaddons.clickgui.settings.Setting.Companion.withDependency
+import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.*
 import de.hxp.hxpaddons.events.GuiEvent
 import de.hxp.hxpaddons.events.TerminalEvent
@@ -21,6 +22,7 @@ import org.lwjgl.glfw.GLFW
  * Ported from odtheking/Odin (BSD-3-Clause, github.com/odtheking/Odin), overlay-on-vanilla-GUI
  * render modes only ("Odin"/"Normal") -- the Custom GUI render mode and its settings were left out.
  */
+@WipModule
 object TerminalSolver : Module(
     name = "Terminal Solver",
     description = "Renders solution for terminals in floor 7.",
