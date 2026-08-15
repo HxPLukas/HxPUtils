@@ -70,6 +70,12 @@ object AutoLoadout : Module(
         on<ScreenEvent.Open> {
             val containerScreen = screen as? AbstractContainerScreen<*> ?: return@on
             val loadout = pendingLoadout ?: return@on
+            // Doesn't consume pendingLoadout on a non-matching screen - a transitional/unrelated screen
+            // opening in between shouldn't cancel waiting for the real loadout GUI.
+            if (!containerScreen.title.string.noControlCodes.contains("loadout", ignoreCase = true)) {
+                devMessage("[AutoLoadout] Ignoring non-matching screen while waiting for loadout $loadout: '${containerScreen.title.string.noControlCodes}'")
+                return@on
+            }
             pendingLoadout = null
 
             dumpScreen(containerScreen, "Opened for /hxp loadout $loadout")
