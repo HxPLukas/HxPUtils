@@ -82,6 +82,9 @@ object OdonataESP : Module(
     private const val DETECTION_PARTICLES = 0
     private const val DETECTION_TEXTURE = 1
 
+    /** Small upward nudge for Head Texture mode's box (see the render pass below) - on request, "minimal höher setzen". */
+    private const val HEAD_TEXTURE_BOX_Y_OFFSET = 0.15
+
     /** How close (in blocks) two enchanted_hit particles must be to count as the same Odonata burst rather than a separate one - see this module's own doc. */
     private const val CLUSTER_DISTANCE = 3.0
 
@@ -146,7 +149,14 @@ object OdonataESP : Module(
             } else {
                 trackedEntities.forEach { entity ->
                     if (!entity.isAlive) return@forEach
-                    val aabb = entity.renderBoundingBox
+                    val full = entity.renderBoundingBox
+                    // Odonata's ArmorStand has a full-height vanilla hitbox, but the actual visible model sits
+                    // low in it - quartering the height and nudging the bottom up slightly (on request, "die
+                    // box vierteln von der höhe und minimal höher setzen") hugs that low visible part instead
+                    // of boxing the whole (mostly empty) ArmorStand hitbox.
+                    val minY = full.minY + HEAD_TEXTURE_BOX_Y_OFFSET
+                    val maxY = minY + (full.maxY - full.minY) / 4.0
+                    val aabb = AABB(full.minX, minY, full.minZ, full.maxX, maxY, full.maxZ)
                     drawFilledBox(aabb, espColor.multiplyAlpha(0.35f), depth = false)
                     drawWireFrameBox(aabb, espColor, thickness = 3f, depth = false)
                 }
