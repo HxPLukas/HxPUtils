@@ -127,7 +127,7 @@ import kotlin.math.max
  * which one in advance. Any matched value is just as reliable a match key as a name (identical every time
  * that exact disguise is worn), and equipment data isn't necessarily gated behind the same close-range
  * requirement Hypixel applies to some nametags. Since the combined value can be long/unreadable and is
- * impossible to copy out of rendered 3D world text, [debugLabelFor] substitutes a short "Texture #N" id for
+ * impossible to copy out of rendered 3D world text, [logDiscoveredTexture] substitutes a short "Texture #N" id for
  * the floating label and chat-dumps a full per-slot breakdown (item id + every signal found, or "no signal"
  * if an equipped item's disguise mechanism still isn't one of the three recognized types) the first time each
  * distinct combination is seen, so the actual copy/paste-into-Entity-Names step happens via chat instead.
@@ -210,7 +210,7 @@ object CustomESP : Module(
     private val forceVisibleArmorStands = mutableSetOf<Entity>()
     private var debugModeActive = false
 
-    /** Raw skin-texture value -> short sequential display id, in discovery order - see [debugLabelFor]'s own doc. Cleared on world change. */
+    /** Raw skin-texture value -> short sequential display id, in discovery order - see [logDiscoveredTexture]'s own doc. Cleared on world change. */
     private val discoveredTextures = linkedMapOf<String, Int>()
 
     /** One matched particle's world position, registry name (for the debug-mode label) and when its highlight should disappear - see [particleESP]'s own doc. */
@@ -312,10 +312,16 @@ object CustomESP : Module(
                 }
 
                 if (showEntityNames && !(isArmorStand && ignoreArmorStandLabels)) {
+                    // Custom Texture mode still dev-logs newly discovered textures (see logDiscoveredTexture) for
+                    // investigation purposes, but the floating label itself is always just the entity's plain
+                    // name/type now (on request - "er soll mir den mob name drüber anzeigen ... niemals no
+                    // equipped items oder so das ist unnötige informationen nur den name") regardless of
+                    // Match Mode, instead of logDiscoveredTexture's Texture-mode-specific placeholder text.
+                    if (matchMode == MATCH_MODE_TEXTURE) logDiscoveredTexture(entity)
                     val box = entity.renderBoundingBox
                     val labelPos = Vec3((box.minX + box.maxX) / 2.0, box.maxY + 0.3, (box.minZ + box.maxZ) / 2.0)
                     val dist = player?.position()?.distanceTo(labelPos) ?: 0.0
-                    drawText(debugLabelFor(entity), labelPos, labelScale(dist), false)
+                    drawText(entity.name.string.noControlCodes, labelPos, labelScale(dist), false)
                 }
             }
 
@@ -372,7 +378,7 @@ object CustomESP : Module(
      * joined together in [MATCH_MODE_TEXTURE] (empty string if it's not a [LivingEntity], or has no equipped
      * item carrying any signal at all - matches nothing, same as any other blank search term would), its
      * current display name/nametag otherwise - this is the value actually compared against
-     * [entityNames]/[ignoreEntityNames]. For the debug-mode floating label specifically, see [debugLabelFor]
+     * [entityNames]/[ignoreEntityNames]. For the debug-mode floating label specifically, see [logDiscoveredTexture]
      * instead - the raw joined value can be long/unreadable and impossible to copy back out of 3D world text.
      */
     private fun labelFor(entity: Entity): String = when (matchMode) {
@@ -384,17 +390,17 @@ object CustomESP : Module(
     }
 
     /**
-     * The text drawn above an entity when [showEntityNames] is on - identical to [labelFor] except in
-     * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
-     * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
-     * "Texture #2", ...) via [discoveredTextures], both drawn in-world and logged once via [devMessage] (only
-     * visible with "Developer Message" on) the first time it's seen - moved off [modMessage]/regular chat
-     * (2026-08-16, on request - originally spammed regular chat during the Odonata investigation ("er spammt
-     * mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then re-added as a dev-only log instead
-     * of removed outright ("mach den dump wieder rein bei developer message") - stays out of the way normally
-     * but is still there to turn on when actually investigating something.
+     * Called purely for its side effect in [MATCH_MODE_TEXTURE] - the floating label itself is always just
+     * the entity's plain name/type now (see the render pass above), this only assigns each distinct combined
+     * signal value seen a short sequential id ("Texture #1", "Texture #2", ...) via [discoveredTextures] and
+     * logs it once via [devMessage] (only visible with "Developer Message" on) the first time it's seen -
+     * moved off [modMessage]/regular chat (2026-08-16, on request - originally spammed regular chat during the
+     * Odonata investigation ("er spammt mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then
+     * re-added as a dev-only log instead of removed outright ("mach den dump wieder rein bei developer
+     * message")) - stays out of the way normally but is still there to turn on when actually investigating a
+     * new disguise.
      */
-    private fun debugLabelFor(entity: Entity): String {
+    private fun logDiscoveredTexture(entity: Entity): String {
         if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
         val living = entity as? LivingEntity ?: return "(not a living entity)"
         val equipped = EquipmentSlot.entries.mapNotNull { slot ->
