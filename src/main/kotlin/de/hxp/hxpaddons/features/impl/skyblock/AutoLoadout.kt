@@ -188,21 +188,25 @@ object AutoLoadout : Module(
 
     /**
      * Temporary diagnostic (on request, printed to regular chat instead of Dev Messages so it's visible
-     * without extra setup): finds whichever top slot's item name contains "loadout 1" and reports its slot
-     * index, so [FIRST_ROW_SLOT] (currently assumed 15) can be checked against what's actually there.
+     * without extra setup): searches *every* slot (not just the assumed top/GUI range - [topSlotCount]'s
+     * "menu size - 36" formula could itself be wrong for this menu) for an item name containing "loadout"
+     * (not "loadout 1" specifically anymore, in case the real label doesn't literally read that) and
+     * reports every match's exact slot index + exact name, so both [FIRST_ROW_SLOT] (assumed 15) and the
+     * expected label text can be checked against what's actually there.
      */
     private fun logLoadoutOneSlot(screen: AbstractContainerScreen<*>) {
-        val top = screen.topSlotCount()
-        for (i in 0 until top) {
+        val matches = mutableListOf<String>()
+        for (i in screen.menu.items.indices) {
             val stack = screen.menu.items.getOrNull(i) ?: continue
             if (stack.isEmpty) continue
             val name = stack.hoverName.string.noControlCodes
-            if (name.contains("loadout 1", ignoreCase = true)) {
-                modMessage("§bAuto Loadout debug: found \"$name\" at slot #$i (assumed $FIRST_ROW_SLOT).")
-                return
-            }
+            if (name.contains("loadout", ignoreCase = true)) matches += "#$i=\"$name\""
         }
-        modMessage("§cAuto Loadout debug: no item containing \"loadout 1\" found in this GUI's top $top slot(s).")
+        if (matches.isEmpty()) {
+            modMessage("§cAuto Loadout debug: no item containing \"loadout\" anywhere in this menu (${screen.menu.items.size} slots total, topSlotCount()=${screen.topSlotCount()}).")
+        } else {
+            modMessage("§bAuto Loadout debug: ${matches.size} match(es) - ${matches.joinToString(", ")}")
+        }
     }
 
     private fun dumpScreen(screen: AbstractContainerScreen<*>, label: String) {
