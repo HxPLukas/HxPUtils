@@ -38,6 +38,7 @@ import de.hxp.hxpaddons.features.impl.general.SmoothWorldLoading
 import de.hxp.hxpaddons.features.impl.render.BorderlessFullscreen
 import de.hxp.hxpaddons.features.impl.render.ClickGUIModule
 import de.hxp.hxpaddons.features.impl.render.CustomESP
+import de.hxp.hxpaddons.features.impl.render.Zoom
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.fabricmc.loader.api.FabricLoader
@@ -106,7 +107,8 @@ object ModuleManager {
             AutoCloseChest,
             PuzzleTriggerbot,
             StarMobESP,
-            CustomESP
+            CustomESP,
+            Zoom
         )
 
         // Its own config file (config/hxpaddons/addons/dungeon-map.json) instead of the shared

@@ -2,6 +2,7 @@ package de.hxp.hxpaddons.mixin.mixins;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import de.hxp.hxpaddons.HxPMod;
+import de.hxp.hxpaddons.features.impl.render.Zoom;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.gui.screens.inventory.ContainerScreen;
 import org.objectweb.asm.Opcodes;
@@ -32,5 +33,12 @@ public class MouseHandlerMixin {
 
     @Inject(method = "releaseMouse", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;getWindow()Lcom/mojang/blaze3d/platform/Window;"))
     private void odin$correctCursorPosition(CallbackInfo ci) {
+    }
+
+    @Inject(method = "onScroll", at = @At("HEAD"), cancellable = true)
+    private void hxp$handleZoomScroll(long window, double xOffset, double yOffset, CallbackInfo ci) {
+        if (Zoom.onScroll(yOffset)) {
+            ci.cancel();
+        }
     }
 }
