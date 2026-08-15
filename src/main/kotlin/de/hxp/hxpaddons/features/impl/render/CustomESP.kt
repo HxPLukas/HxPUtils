@@ -31,6 +31,7 @@ import net.minecraft.world.entity.EquipmentSlot
 import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
@@ -425,5 +426,65 @@ object CustomESP : Module(
     private fun RenderEvent.Extract.drawEntityBox(aabb: AABB) {
         drawFilledBox(aabb, espColor.multiplyAlpha(boxOpacity / 100f), depth = false)
         drawWireFrameBox(aabb, espColor, thickness = boxOutlineWidth.toFloat(), depth = false)
+    }
+
+    /**
+     * `/hxp esp dump` - on request ("mach den full dump ... ich will alles an infos haben was man bekommen
+     * kann"), dumps everything readily readable about whatever entity is currently under the crosshair to
+     * chat: identity (type, UUID, name, distance), live state (pose, invisible, velocity - the last one is
+     * the only signal here that actually distinguishes "moving/alive-behaving" from "static prop", since
+     * everything else is just a snapshot), riding relationships (what it's riding/being ridden by),
+     * ArmorStand-specific flags ([ArmorStand.isMarker] especially - a marker ArmorStand has no
+     * hitbox/collision at all and is almost always pure decoration, unlike an interactive disguised mob) and
+     * limb poses, equipment (every slot's item id + [de.hxp.hxpaddons.utils.disguiseSignals], reusing the
+     * exact same logic [labelFor]'s Custom Texture mode does), health, and - the actual "everything" answer -
+     * every entry [net.minecraft.network.syncher.SynchedEntityData.getNonDefaultValues] returns, i.e. every
+     * synced entity-data field currently holding a non-default value, by raw id and value. That's the
+     * complete set of data this client has received about the entity at all.
+     */
+    fun dumpLookedAtEntity() {
+        val target = (mc.hitResult as? EntityHitResult)?.entity
+        if (target == null) {
+            modMessage("§cNo entity under your crosshair right now - look directly at one and try again.")
+            return
+        }
+
+        modMessage("§6=== Entity Dump: ${target.type.description.string.noControlCodes} ===")
+        modMessage("§7Type: §f${BuiltInRegistries.ENTITY_TYPE.getKey(target.type)}")
+        modMessage("§7UUID: §f${target.uuid}")
+        modMessage("§7Distance: §f${"%.2f".format(mc.player?.distanceTo(target) ?: -1.0)}")
+        modMessage("§7hasCustomName: §f${target.hasCustomName()} §7name: §f${target.name.string.noControlCodes}")
+        modMessage("§7Pose: §f${target.pose} §7Invisible: §f${target.isInvisible} §7Velocity: §f${target.deltaMovement}")
+
+        target.vehicle?.let { modMessage("§7Riding: §f${BuiltInRegistries.ENTITY_TYPE.getKey(it.type)}") }
+        if (target.passengers.isNotEmpty()) {
+            modMessage("§7Passengers: §f${target.passengers.joinToString(", ") { p -> "${BuiltInRegistries.ENTITY_TYPE.getKey(p.type)}" }}")
+        }
+
+        if (target is ArmorStand) {
+            modMessage("§7ArmorStand: isMarker=${target.isMarker} isSmall=${target.isSmall} showArms=${target.showArms()} showBasePlate=${target.showBasePlate()}")
+            modMessage(
+                "§7  HeadPose=${target.headPose} BodyPose=${target.bodyPose} LeftArmPose=${target.leftArmPose} " +
+                    "RightArmPose=${target.rightArmPose} LeftLegPose=${target.leftLegPose} RightLegPose=${target.rightLegPose}"
+            )
+        }
+
+        if (target is LivingEntity) {
+            modMessage("§7Health: §f${target.health}/${target.maxHealth}")
+            val equipment = EquipmentSlot.entries.mapNotNull { slot ->
+                val stack = target.getItemBySlot(slot)
+                if (stack.isEmpty) null else {
+                    val signals = stack.disguiseSignals
+                    "$slot=${BuiltInRegistries.ITEM.getKey(stack.item)}" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else ""
+                }
+            }
+            modMessage(if (equipment.isEmpty()) "§7Equipment: §fnone" else "§7Equipment: §f${equipment.joinToString(" | ")}")
+        }
+
+        val values = target.entityData.nonDefaultValues.orEmpty()
+        modMessage("§7Synced data (${values.size} non-default entries):")
+        for (value in values) {
+            modMessage("§8  #${value.id()}: §f${value.value()}")
+        }
     }
 }
