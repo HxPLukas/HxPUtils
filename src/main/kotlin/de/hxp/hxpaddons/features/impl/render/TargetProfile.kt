@@ -29,7 +29,7 @@ data class TargetProfile(
     var entityType: String = "",
     /** Matched against the entity's current display name/nametag - same field [CustomESP]'s own Name Tag mode reads. */
     var name: String = "",
-    /** Matched against any [de.hxp.hxpaddons.utils.disguiseSignals] value found on ANY equipped slot (skull skin texture, CustomModelData string, or ItemModel id) - same signal [CustomESP]'s Custom Texture mode and [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP] read. */
+    /** Matched against any [de.hxp.hxpaddons.utils.disguiseSignals] value found on the entity itself - either its own fake-player skin (if it's secretly a disguised [net.minecraft.world.entity.player.Player]) or any equipped slot's skull skin texture/CustomModelData string/ItemModel id - same signal [CustomESP]'s texture discovery logging and [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP] read. */
     var skinId: String = "",
     /** Matched against the [EquipmentSlot.MAINHAND] item's display name, e.g. "Iron Sword". */
     var heldItem: String = "",
@@ -66,12 +66,7 @@ data class TargetProfile(
         if (name.isNotBlank() && !entity.name.string.noControlCodes.contains(name, ignoreCase = true)) return false
 
         val living = entity as? LivingEntity
-        if (skinId.isNotBlank()) {
-            val hasSignal = living != null && EquipmentSlot.entries.any { slot ->
-                living.getItemBySlot(slot).disguiseSignals.any { it.contains(skinId, ignoreCase = true) }
-            }
-            if (!hasSignal) return false
-        }
+        if (skinId.isNotBlank() && entity.disguiseSignals.none { it.contains(skinId, ignoreCase = true) }) return false
         if (heldItem.isNotBlank() && !slotMatches(living, EquipmentSlot.MAINHAND, heldItem)) return false
         if (helmet.isNotBlank() && !slotMatches(living, EquipmentSlot.HEAD, helmet)) return false
         if (chestplate.isNotBlank() && !slotMatches(living, EquipmentSlot.CHEST, chestplate)) return false
