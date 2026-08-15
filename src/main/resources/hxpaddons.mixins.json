@@ -21,6 +21,7 @@
     "mixins.AnvilMenuMixin",
     "mixins.AnvilScreenMixin",
     "mixins.BorderlessFullscreenMixin",
+    "mixins.CameraMixin",
     "mixins.ClientBrandRetrieverMixin",
     "mixins.GuiGraphicsMixin",
     "mixins.AvatarRendererMixin",
