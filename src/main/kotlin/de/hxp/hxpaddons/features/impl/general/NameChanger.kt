@@ -1,5 +1,6 @@
 package de.hxp.hxpaddons.features.impl.general
 
+import de.hxp.hxpaddons.HxPMod.mc
 import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.ColorSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.StringSetting
@@ -14,8 +15,12 @@ import net.minecraft.network.chat.TextColor
 import net.minecraft.network.chat.contents.PlainTextContents
 
 /**
- * Cosmetically replaces every occurrence of one name with another (in a configurable color) wherever it
- * shows up in chat text - join/leave messages, guild/party/co-op chat, achievement broadcasts, etc.
+ * Cosmetically replaces every occurrence of your own name with another (in a configurable color) wherever
+ * it shows up in chat text - join/leave messages, guild/party/co-op chat, achievement broadcasts, etc.
+ *
+ * The name to look for is always your own account name ([mc]'s game profile, falling back to the launcher
+ * session name if no player entity exists yet) - not user-entered, so it can't drift out of sync if you
+ * change accounts.
  *
  * Hooks Fabric API's `MODIFY_GAME` event directly (not this mod's own [de.hxp.hxpaddons.events.ChatPacketEvent],
  * which only supports hiding a message outright, not rewriting it) and rebuilds the message's component tree:
@@ -31,10 +36,10 @@ import net.minecraft.network.chat.contents.PlainTextContents
 @WipModule
 object NameChanger : Module(
     name = "Name Changer",
-    description = "Replaces a name with another one (in a configurable color) wherever it shows up in chat.",
+    description = "Replaces your own name with another one (in a configurable color) wherever it shows up in chat.",
     category = Category.GENERAL
 ) {
-    private val targetName by StringSetting("Name to Replace", "", 32, "The name to look for in chat (case-insensitive).")
+    private val targetName: String get() = mc.player?.gameProfile?.name ?: mc.user.name
     private val replacementName by StringSetting("Replacement", "", 32, "The name shown instead.")
     private val replacementColor by ColorSetting("Replacement Color", Colors.MINECRAFT_AQUA, desc = "Color the replacement name is shown in.")
 
