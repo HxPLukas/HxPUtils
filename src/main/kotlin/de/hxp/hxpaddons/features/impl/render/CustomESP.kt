@@ -16,6 +16,7 @@ import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
+import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
 import de.hxp.hxpaddons.utils.render.drawFilledBox
@@ -25,8 +26,11 @@ import de.hxp.hxpaddons.utils.renderBoundingBox
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
+import net.minecraft.world.entity.EquipmentSlot
+import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.phys.AABB
+import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
@@ -101,9 +105,11 @@ import kotlin.math.max
  * behavior the single old toggle had). Deliberately entity-side only - doesn't affect [particleESP] at all.
  *
  * Name Tag mode + ArmorStand-held mob names (2026-08-15, bugfix): a matched ArmorStand's highlight now also
- * resolves to the real mob entity standing directly beneath it (same technique [StarMobESP] already uses) -
- * previously a match against the ArmorStand's name (which is where dungeon-style mobs like "Crypt Ghoul"
- * actually carry their display name, not the mob entity itself) got silently dropped by
+ * resolves to the real mob entity standing directly beneath it (see [resolveMobBelow], same core idea
+ * [StarMobESP] already uses, but preferring the exact riding relationship over a proximity guess where
+ * possible - a crowded room with several similar mobs standing close together could otherwise resolve to the
+ * *wrong* neighbor) - previously a match against the ArmorStand's name (which is where dungeon-style mobs
+ * like "Crypt Ghoul" actually carry their display name, not the mob entity itself) got silently dropped by
  * [ignoreArmorStandVisual] (on by default) before ever reaching the render pass, making the match look like
  * it never fired.
  *
@@ -233,8 +239,7 @@ object CustomESP : Module(
                     // explicit name match.
                     if (matchMode != MATCH_MODE_TYPE && e is ArmorStand) {
                         forceVisibleArmorStands.add(e)
-                        mc.level?.getEntities(e, e.boundingBox.move(0.0, -1.0, 0.0)) { it !is ArmorStand && it.isAlive }
-                            ?.firstOrNull()?.let { entities.add(it) }
+                        resolveMobBelow(e)?.let { entities.add(it) }
                     }
                 }
             }
@@ -318,6 +323,24 @@ object CustomESP : Module(
         }
     }
 
+    /**
+     * Resolves a name-holder ArmorStand down to the real mob it belongs to - on request, after a report that
+     * a crowded room (several similar mobs standing close together, e.g. a Crypt farming spot) could highlight
+     * the *wrong* neighboring mob ("das er das falsche filtert was ich garnicht will"). Tries the exact
+     * relationship first: if the ArmorStand is riding something (Hypixel's common implementation for this
+     * exact nametag-holder pattern), that vehicle IS the mob, no ambiguity possible. Only falls back to a
+     * proximity search (closest non-ArmorStand entity in a small box just below the ArmorStand, not just
+     * whatever [net.minecraft.world.level.Level.getEntities] happens to return first) for ArmorStands that
+     * aren't riding anything, which is inherently a best-effort guess in a crowded room.
+     */
+    private fun resolveMobBelow(armorStand: ArmorStand): Entity? {
+        val vehicle = armorStand.vehicle
+        if (vehicle != null && vehicle !is ArmorStand && vehicle.isAlive) return vehicle
+
+        return mc.level?.getEntities(armorStand, armorStand.boundingBox.move(0.0, -1.0, 0.0)) { it !is ArmorStand && it.isAlive }
+            ?.minByOrNull { it.distanceToSqr(armorStand) }
+    }
+
     /** The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], its current display name/nametag otherwise - used both for matching against [entityNames] and as the debug-mode floating label. */
     private fun labelFor(entity: Entity): String =
         if (matchMode == MATCH_MODE_TYPE) entity.type.description.string
@@ -329,5 +352,48 @@ object CustomESP : Module(
     private fun RenderEvent.Extract.drawEntityBox(aabb: AABB) {
         drawFilledBox(aabb, espColor.multiplyAlpha(boxOpacity / 100f), depth = false)
         drawWireFrameBox(aabb, espColor, thickness = boxOutlineWidth.toFloat(), depth = false)
+    }
+
+    /**
+     * `/hxp esp dump` - on request, to investigate whether some field on a mob's own entity identifies it
+     * (e.g. as "Crypt Ghoul") earlier than its nametag-holder ArmorStand becomes available (see this module's
+     * own history of that exact problem) - "ich weiß dass es irgendwie über fields geht ich weiß nur nicht wie
+     * genau". Dumps everything readily inspectable about whatever entity is currently under the crosshair to
+     * chat: type, UUID, distance, custom-name state, pose, equipment (all [EquipmentSlot]s, not just
+     * hand/armor named accessors, so it also covers body armor on horses/wolves etc.), and - the actual answer
+     * to "which fields" - every entry [net.minecraft.network.syncher.SynchedEntityData.getNonDefaultValues]
+     * returns, i.e. every synced entity-data field currently holding a non-default value, by raw id and
+     * value. That's the complete set of data this client has received about the entity at all; if "Crypt
+     * Ghoul" doesn't show up as a value anywhere in that dump while looking at the mob (not the ArmorStand)
+     * from range, no field distinguishes it early - the server simply hasn't sent that information yet.
+     */
+    fun dumpLookedAtEntity() {
+        val target = (mc.hitResult as? EntityHitResult)?.entity
+        if (target == null) {
+            modMessage("§cNo entity under your crosshair right now - look directly at one and try again.")
+            return
+        }
+
+        modMessage("§6=== Entity Dump: ${target.type.description.string.noControlCodes} ===")
+        modMessage("§7Type: §f${BuiltInRegistries.ENTITY_TYPE.getKey(target.type)}")
+        modMessage("§7UUID: §f${target.uuid}")
+        modMessage("§7Distance: §f${"%.2f".format(mc.player?.distanceTo(target) ?: -1.0)}")
+        modMessage("§7hasCustomName: §f${target.hasCustomName()} §7name: §f${target.name.string.noControlCodes}")
+        modMessage("§7Pose: §f${target.pose}")
+
+        if (target is LivingEntity) {
+            modMessage("§7Health: §f${target.health}/${target.maxHealth}")
+            val equipment = EquipmentSlot.entries.mapNotNull { slot ->
+                val stack = target.getItemBySlot(slot)
+                if (stack.isEmpty) null else "$slot=${stack.hoverName.string.noControlCodes}"
+            }
+            modMessage(if (equipment.isEmpty()) "§7Equipment: §fnone" else "§7Equipment: §f${equipment.joinToString(", ")}")
+        }
+
+        val values = target.entityData.nonDefaultValues.orEmpty()
+        modMessage("§7Synced data (${values.size} non-default entries):")
+        for (value in values) {
+            modMessage("§8  #${value.id()}: §f${value.value()}")
+        }
     }
 }
