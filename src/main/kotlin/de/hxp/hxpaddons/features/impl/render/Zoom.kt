@@ -2,6 +2,7 @@ package de.hxp.hxpaddons.features.impl.render
 
 import de.hxp.hxpaddons.HxPMod.mc
 import de.hxp.hxpaddons.clickgui.settings.AlwaysActive
+import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.KeybindSetting.Companion.isDown
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
@@ -57,6 +58,7 @@ import kotlin.math.sign
  * ("es passiert nichts wenn ich den keybind drücke").
  */
 @AlwaysActive
+@WipModule
 object Zoom : Module(
     name = "Zoom",
     key = null,
