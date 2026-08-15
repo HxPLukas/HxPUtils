@@ -12,7 +12,6 @@ import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
 import de.hxp.hxpaddons.features.impl.skyblock.BazaarFlipper
 import de.hxp.hxpaddons.features.impl.skyblock.FuseCheck
 import de.hxp.hxpaddons.features.impl.skyblock.Fuser
-import de.hxp.hxpaddons.features.impl.render.CustomESP
 import de.hxp.hxpaddons.utils.handlers.schedule
 import de.hxp.hxpaddons.utils.devMessage
 import de.hxp.hxpaddons.utils.modMessage
@@ -76,12 +75,6 @@ val mainCommand = Commodore("hxpaddons", "hxp") {
 
     literal("loadout") {
         runs { n: Int -> AutoLoadout.equip(n) }
-    }
-
-    literal("esp") {
-        literal("dump") {
-            runs { CustomESP.dumpLookedAtEntity() }
-        }
     }
 
     literal("recipe") {
@@ -243,7 +236,6 @@ private fun printHelp() {
     modMessage("§f/hxp fish [stop] §7- toggles Auto Fish.")
     modMessage("§f/hxp garden reset §7- resets the Phantom Leaf Solver.")
     modMessage("§f/hxp loadout <n> §7- equips loadout n via /loadout.")
-    modMessage("§f/hxp esp dump §7- dumps every data field this client has for whatever entity you're looking at.")
     modMessage("§f/hxp wip §7- toggles WIP modules in the Click GUI.")
 }
 
