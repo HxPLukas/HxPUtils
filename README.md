@@ -28,6 +28,7 @@ A Hypixel Skyblock QoL Fabric mod, based on Odin by odtheking (see [`LICENSE`](L
 
 ### 🎨 Render
 - **Custom ESP** — highlights entities (and optionally particles) matching a name/type list through walls.
+- **Zoom** — hold a keybind to reduce FOV, scroll to adjust; optional Smooth Mode (eased zoom transition + smoothed camera turning) and zoom-depth-scaled mouse sensitivity.
 - **Borderless Fullscreen** — replaces Minecraft's exclusive fullscreen with a borderless window (F11).
 
 ### 💬 General
