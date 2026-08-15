@@ -42,7 +42,9 @@ import kotlin.math.sign
  * a mixin into [net.minecraft.client.MouseHandler]'s `turnPlayer` (see [de.hxp.hxpaddons.mixin.mixins.MouseHandlerMixin],
  * `hxp$scaleZoomSensitivity`) that scales the raw accumulated mouse-delta fields the method reads, computed
  * from [displayedFov] (the *actual* current visual FOV, so it tracks mid-fade too, not just the target) via
- * [sensitivityMultiplier].
+ * [sensitivityMultiplier]. [turnSensitivity] (on request, "ein setting welches die sensitivity bearbeiten
+ * lässt mit welcher man sich rotated") is a separate, direct multiplier layered on top of that automatic
+ * zoom-depth scaling, for fine-tuning turn speed to taste independent of how far zoomed in you are.
  *
  * [smoothMode] (on request, "ein mode der so smooth reinzoomt als so fade in ... und wenn man die kamera
  * bewegt es expotential und wenn meine maus still ist ... dass er dann noch so weiter dreht immer weniger"):
@@ -72,23 +74,27 @@ object Zoom : Module(
     toggled = true
 ) {
     private val zoomKey by KeybindSetting("Keybind", GLFW.GLFW_KEY_UNKNOWN, desc = "Hold to zoom in, release to zoom back out.")
-    private val startFov by NumberSetting("Start FOV", 20.0, 0.1, 90.0, 0.5, desc = "FOV as soon as the key is pressed, before any scrolling.")
-    private val minFov by NumberSetting("Min FOV", 0.5, 0.1, 90.0, 0.1, desc = "The lowest FOV scrolling further in can reach.")
-    private val scrollStep by NumberSetting("Scroll Step", 1.0, 0.1, 20.0, 0.1, desc = "How much FOV changes per scroll notch.")
+    private val startFov by NumberSetting("Start FOV", 14.5, 0.1, 90.0, 0.5, desc = "FOV as soon as the key is pressed, before any scrolling.")
+    private val minFov by NumberSetting("Min FOV", 0.1, 0.1, 90.0, 0.1, desc = "The lowest FOV scrolling further in can reach.")
+    private val scrollStep by NumberSetting("Scroll Step", 1.5, 0.1, 20.0, 0.1, desc = "How much FOV changes per scroll notch.")
     private val sensitivityScale by NumberSetting(
-        "Sensitivity Scaling", 50.0, 0.0, 100.0, 5.0, unit = "%",
+        "Sensitivity Scaling", 85.0, 0.0, 100.0, 5.0, unit = "%",
         desc = "How much mouse sensitivity is reduced the further you're currently zoomed in - 100% scales it fully with the zoom ratio (zoomed to a third of the FOV = a third of the sensitivity), 0% leaves sensitivity untouched regardless of zoom."
     )
+    private val turnSensitivity by NumberSetting(
+        "Turn Sensitivity", 100.0, 10.0, 300.0, 5.0, unit = "%",
+        desc = "Manual multiplier on top of Sensitivity Scaling for how fast you rotate the camera while zoomed - 100% is unchanged, lower is slower, higher is faster."
+    )
     private val smoothMode by BooleanSetting(
-        "Smooth Mode", false,
+        "Smooth Mode", true,
         desc = "Eases FOV in/out at a constant (linear) rate instead of an instant snap, and smooths camera turning (with a brief coast when you stop moving the mouse) while zoomed, via Minecraft's own Smooth Camera option."
     )
     private val smoothZoomInDurationMs by NumberSetting(
-        "Smooth Zoom In Duration", 120.0, 50.0, 3000.0, 25.0, unit = "ms",
+        "Smooth Zoom In Duration", 100.0, 50.0, 3000.0, 25.0, unit = "ms",
         desc = "How long the ease takes when zooming in or adjusting the zoom level via scroll while held."
     ).withDependency { smoothMode }
     private val smoothZoomOutDurationMs by NumberSetting(
-        "Smooth Zoom Out Duration", 200.0, 50.0, 3000.0, 25.0, unit = "ms",
+        "Smooth Zoom Out Duration", 150.0, 50.0, 3000.0, 25.0, unit = "ms",
         desc = "How long the ease takes when releasing the key and zooming back out - kept separate from zoom-in duration since the same speed can feel too fast on the way out."
     ).withDependency { smoothMode }
 
@@ -216,7 +222,8 @@ object Zoom : Module(
         val current = displayedFov ?: return 1.0
         val ratio = (current / startFov.toFloat()).toDouble().coerceIn(0.0, 1.0)
         val scale = (sensitivityScale / 100.0).coerceIn(0.0, 1.0)
-        return 1.0 - scale * (1.0 - ratio)
+        val autoScaled = 1.0 - scale * (1.0 - ratio)
+        return autoScaled * (turnSensitivity / 100.0)
     }
 
     /**
