@@ -1,10 +1,10 @@
 package de.hxp.hxpaddons.features.impl.garden
 
 import de.hxp.hxpaddons.clickgui.settings.Setting.Companion.withDependency
-import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.ColorSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.SelectorSetting
+import de.hxp.hxpaddons.clickgui.settings.impl.StringSetting
 import de.hxp.hxpaddons.events.RenderEvent
 import de.hxp.hxpaddons.events.TickEvent
 import de.hxp.hxpaddons.events.WorldEvent
@@ -13,7 +13,6 @@ import de.hxp.hxpaddons.features.Category
 import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
-import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
 import de.hxp.hxpaddons.utils.render.drawFilledBox
 import de.hxp.hxpaddons.utils.render.drawWireFrameBox
@@ -21,22 +20,16 @@ import de.hxp.hxpaddons.utils.renderBoundingBox
 import de.hxp.hxpaddons.utils.skyblock.Island
 import de.hxp.hxpaddons.utils.skyblock.LocationUtils
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.LivingEntity
-import net.minecraft.world.entity.decoration.ArmorStand
-import net.minecraft.world.entity.player.Player
+import net.minecraft.world.entity.EntityType
 import net.minecraft.world.phys.AABB
 
 /**
- * Highlights Garden pests through walls. Pests aren't a distinct entity type on Hypixel - they're regular
- * mobs (Silverfish/Bat/etc.) whose own display name is just the pest's name (no separate health-bar
- * ArmorStand like dungeon mobs use, see [de.hxp.hxpaddons.features.impl.dungeon.StarMobESP]) - detection
- * here matches that name directly, the same principle SkyHanni's PestApi uses (github.com/hannibal002/SkyHanni,
- * GPL-3.0; logic reimplemented independently here, not ported).
- *
- * Marked [WipModule] since the pest name list/detection couldn't be verified against a live garden - enable
- * via `/hxp wip` to test and report back if any pest doesn't get picked up.
+ * Highlights Garden pests through walls, Garden-only. Hypixel renders every pest as a vanilla Silverfish
+ * entity (just reskinned/renamed per pest type), so unlike the old name-list approach this matches by
+ * [EntityType.SILVERFISH] directly - same [ESP Type]/opacity/color/scan-distance rendering as
+ * [de.hxp.hxpaddons.features.impl.render.CustomESP], just with no name-label option at all (on request -
+ * every Silverfish in the Garden is a pest, there's nothing to identify).
  */
-@WipModule
 object PestESP : Module(
     name = "Pest ESP",
     description = "Highlights garden pests through walls.",
@@ -46,29 +39,33 @@ object PestESP : Module(
     private val outlineOpacity by NumberSetting("Outline Opacity", 100, 0, 100, 1, unit = "%", desc = "Opacity of the glowing outline.").withDependency { espType == ESP_TYPE_OUTLINE }
     private val boxOutlineWidth by NumberSetting("Box Outline Width", 3, 0, 10, 1, desc = "Width of the box's outline.").withDependency { espType == ESP_TYPE_BOX }
     private val boxOpacity by NumberSetting("Box Opacity", 50, 0, 100, 1, unit = "%", desc = "Opacity of the box's fill.").withDependency { espType == ESP_TYPE_BOX }
-
     private val pestColor by ColorSetting("Pest Color", Colors.MINECRAFT_GREEN, true, desc = "The color pests are highlighted in.")
+    private val scanDistanceInput by StringSetting("Scan Distance", "64", length = 10, desc = "Maximum distance (in blocks) a pest can be from you to get matched/highlighted - type any number, no fixed upper limit.")
 
     // Indices into the "ESP Type" SelectorSetting's option list above.
     private const val ESP_TYPE_OUTLINE = 0
     private const val ESP_TYPE_BOX = 1
 
-    // The exact display names Hypixel gives pest mobs, lowercased for a case-insensitive match.
-    private val pestNames = hashSetOf(
-        "beetle", "cricket", "earthworm", "field mouse", "fly", "locust", "lunar moth", "mite",
-        "mosquito", "moth", "rat", "slug", "praying mantis", "firefly", "dragonfly"
-    )
+    /** [scanDistanceInput]'s fallback if the typed text doesn't parse as a number at all. */
+    private const val DEFAULT_SCAN_DISTANCE = 64.0
+
+    /** [scanDistanceInput]'s sanity ceiling - not a real functional limit, just a guard against a typo like an extra zero. */
+    private const val MAX_SCAN_DISTANCE = 100_000.0
 
     private val entities = mutableSetOf<Entity>()
+
+    private fun currentScanDistance(): Double = scanDistanceInput.trim().toDoubleOrNull()?.coerceIn(1.0, MAX_SCAN_DISTANCE) ?: DEFAULT_SCAN_DISTANCE
 
     init {
         on<TickEvent.End> {
             if (!enabled || !LocationUtils.isCurrentArea(Island.Garden)) return@on
+            val player = mc.player ?: return@on
+            val maxDistSq = currentScanDistance() * currentScanDistance()
 
             entities.clear()
             mc.level?.entitiesForRendering()?.forEach { e ->
-                if (e !is LivingEntity || e is Player || e is ArmorStand || !e.isAlive) return@forEach
-                if (e.name.string.noControlCodes.lowercase() !in pestNames) return@forEach
+                if (e.type != EntityType.SILVERFISH || !e.isAlive) return@forEach
+                if (player.distanceToSqr(e) > maxDistSq) return@forEach
                 entities.add(e)
             }
         }
@@ -79,8 +76,9 @@ object PestESP : Module(
                 return@on
             }
 
-            // Rebuilt every frame from the currently tracked entities, same as StarMobESP, so a pest that
-            // stops being tracked (dies, ESP Type gets switched) never keeps glowing from a stale entry.
+            // Rebuilt every frame from the currently tracked entities, same as CustomESP/StarMobESP, so a
+            // pest that stops being tracked (dies, ESP Type gets switched) never keeps glowing from a stale
+            // entry.
             EntityOutlineESP.clear()
             entities.forEach { entity ->
                 if (!entity.isAlive) return@forEach
