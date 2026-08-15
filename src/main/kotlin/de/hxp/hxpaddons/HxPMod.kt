@@ -36,7 +36,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 
 object HxPMod : ClientModInitializer {
 
-    val logger: Logger = LogManager.getLogger("HxPAddons")
+    val logger: Logger = LogManager.getLogger("HxPUtils")
 
     @JvmStatic
     val mc: Minecraft = Minecraft.getInstance()
@@ -46,7 +46,7 @@ object HxPMod : ClientModInitializer {
      * @see de.hxp.hxpaddons.config.ModuleConfig
      * @see de.hxp.hxpaddons.config.DungeonWaypointConfig
      */
-    val configFile: File = File(mc.gameDirectory, "config/hxpaddons/").apply {
+    val configFile: File = File(mc.gameDirectory, "config/hxputils/").apply {
         try {
             if (isFile) delete() // Delete old bugged files that prevent creating the directory
             if (!exists()) mkdirs()
@@ -56,7 +56,7 @@ object HxPMod : ClientModInitializer {
         }
     }
 
-    const val MOD_ID = "hxpaddons"
+    const val MOD_ID = "hxputils"
 
     val version: Version by lazy { FabricLoader.getInstance().getModContainer(MOD_ID).orElseThrow().metadata.version }
     val scope = CoroutineScope(SupervisorJob() + EmptyCoroutineContext)

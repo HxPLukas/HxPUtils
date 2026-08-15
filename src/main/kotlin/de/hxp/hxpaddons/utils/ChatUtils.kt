@@ -18,13 +18,13 @@ fun sendCommand(command: String) {
     mc.execute { mc.player?.connection?.sendCommand(command) }
 }
 
-fun modMessage(message: Any?, prefix: String = "§3HxPAddons §8»§r ", chatStyle: Style? = null) {
+fun modMessage(message: Any?, prefix: String = "§3HxPUtils §8»§r ", chatStyle: Style? = null) {
     val text = Component.literal("$prefix$message")
     chatStyle?.let { text.setStyle(chatStyle) }
     mc.execute { mc.gui.chat.addClientSystemMessage(text) }
 }
 
-fun modMessage(message: Component, prefix: String = "§3HxPAddons §8»§r ", chatStyle: Style? = null) {
+fun modMessage(message: Component, prefix: String = "§3HxPUtils §8»§r ", chatStyle: Style? = null) {
     val text = Component.literal(prefix).append(message)
     chatStyle?.let { text.setStyle(chatStyle) }
     mc.execute { mc.gui.chat.addClientSystemMessage(text) }
@@ -32,7 +32,7 @@ fun modMessage(message: Component, prefix: String = "§3HxPAddons §8»§r ", ch
 
 fun devMessage(message: Any?) {
     if (!ClickGUIModule.devMessage) return
-    modMessage(message, "§3HxPAddons§bDev §8»§r ")
+    modMessage(message, "§3HxPUtils§bDev §8»§r ")
     DiscordLogger.log(message.toString())
 }
 

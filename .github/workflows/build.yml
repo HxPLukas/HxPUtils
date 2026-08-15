@@ -33,6 +33,6 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           path: |
-            build/libs/HxPAddons-*.jar
-            !build/libs/HxPAddons-*-sources.jar
+            build/libs/HxPUtils-*.jar
+            !build/libs/HxPUtils-*-sources.jar
           archive: false

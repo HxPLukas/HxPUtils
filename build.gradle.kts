@@ -100,7 +100,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             groupId = "de.hxp"
-            artifactId = "HxPAddons"
+            artifactId = "HxPUtils"
             version = version
             from(components["java"])
         }

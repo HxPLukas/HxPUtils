@@ -6,7 +6,7 @@
   "description": "${mod_description}",
   "authors": ["HxPLukas"],
   "contact": {
-    "sources": "https://github.com/hxplukas/hxpaddons"
+    "sources": "https://github.com/HxPLukas/HxPUtils"
   },
   "icon": "assets/hxpaddons/icon.png",
   "license": "BSD 3-Clause",

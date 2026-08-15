@@ -1,0 +1,56 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup jdk 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: 25
+
+      - name: setup gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: build
+        run: ./gradlew build
+
+      - name: create github release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/libs/HxPUtils-*.jar
+            !build/libs/HxPUtils-*-sources.jar
+          generate_release_notes: true
+
+      # Requires a repository secret named DISCORD_WEBHOOK_URL (Settings -> Secrets and variables ->
+      # Actions -> New repository secret). Left as continue-on-error so a missing/misconfigured webhook
+      # doesn't turn an otherwise-successful release red.
+      - name: notify discord
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          JAR_NAME=$(basename "$(ls build/libs/HxPUtils-*.jar | grep -v sources)")
+          curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg title "HxPUtils $TAG released" \
+              --arg url "https://github.com/${{ github.repository }}/releases/tag/$TAG" \
+              --arg desc "New HxPUtils build available: **$JAR_NAME**" \
+              '{embeds: [{title: $title, url: $url, description: $desc, color: 3447003}]}')"

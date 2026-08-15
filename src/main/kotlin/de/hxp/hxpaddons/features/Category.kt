@@ -27,6 +27,8 @@ data class Category private constructor(val name: String) {
         // val BOSS = custom(name = "Boss")2
         // @JvmField
         // val NETHER = custom(name = "Nether")
+        // @JvmField
+        // val MINING = custom(name = "Mining") // was only used by Crystal Hollows Map, removed for HxPUtils
 
         /**
          * Returns a category with name provided.

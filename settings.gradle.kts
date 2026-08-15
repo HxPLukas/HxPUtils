@@ -1,4 +1,4 @@
-rootProject.name = "HxPAddons"
+rootProject.name = "HxPUtils"
 pluginManagement {
 
     repositories {

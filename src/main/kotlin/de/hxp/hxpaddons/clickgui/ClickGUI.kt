@@ -155,7 +155,7 @@ object ClickGUI : Screen(Component.literal("Click GUI")) {
 
             // ── Title bar ──────────────────────────────────────────
             NVGRenderer.circle(cx + PAD + 4f, cy + TITLE_H / 2f, 4f, accent.rgba)
-            NVGRenderer.text("HxPAddons", cx + PAD + 16f, cy + TITLE_H / 2f - FS_TITLE / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
+            NVGRenderer.text("HxPUtils", cx + PAD + 16f, cy + TITLE_H / 2f - FS_TITLE / 2f, FS_TITLE, Colors.WHITE.rgba, NVGRenderer.defaultFont)
 
             val closeSize = FS_TITLE * 1.2f
             val closeX = cx + W - PAD - closeSize

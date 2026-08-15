@@ -26,7 +26,6 @@ import de.hxp.hxpaddons.features.impl.dungeon.StarMobESP
 import de.hxp.hxpaddons.features.impl.dungeon.TerminalSolver
 import de.hxp.hxpaddons.features.impl.dungeon.TerminalTriggerbot
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
-import de.hxp.hxpaddons.features.impl.skyblock.BazaarFlipper
 import de.hxp.hxpaddons.features.impl.skyblock.Combat
 import de.hxp.hxpaddons.features.impl.skyblock.NoRotate
 import de.hxp.hxpaddons.features.impl.skyblock.TermAutoClicker
@@ -36,12 +35,8 @@ import de.hxp.hxpaddons.features.impl.general.AutoDialogue
 import de.hxp.hxpaddons.features.impl.general.ChatFilter
 import de.hxp.hxpaddons.features.impl.general.CompactChat
 import de.hxp.hxpaddons.features.impl.general.CopyChat
-import de.hxp.hxpaddons.features.impl.general.LobbyHopper
 import de.hxp.hxpaddons.features.impl.general.ModIdHider
 import de.hxp.hxpaddons.features.impl.general.SmoothWorldLoading
-import de.hxp.hxpaddons.features.impl.mining.CrystalHollowsMap
-import de.hxp.hxpaddons.features.impl.mining.CrystalHollowsStructureFinder
-import de.hxp.hxpaddons.features.impl.mining.GoldenDragonFinder
 import de.hxp.hxpaddons.features.impl.render.BorderlessFullscreen
 import de.hxp.hxpaddons.features.impl.render.ClickGUIModule
 import de.hxp.hxpaddons.features.impl.render.CustomESP
@@ -88,10 +83,10 @@ object ModuleManager {
      */
     var showWipModules = false
 
-    private val HUD_LAYER: Identifier = fromNamespaceAndPath(HxPMod.MOD_ID, "hxpaddons_hud")
+    private val HUD_LAYER: Identifier = fromNamespaceAndPath(HxPMod.MOD_ID, "hxputils_hud")
 
     init {
-        registerModules(config = ModuleConfig(file = File(HxPMod.configFile, "hxpaddons-config.json")),
+        registerModules(config = ModuleConfig(file = File(HxPMod.configFile, "hxputils-config.json")),
             ClickGUIModule,
             BorderlessFullscreen,
             AutoDialogue,
@@ -100,7 +95,6 @@ object ModuleManager {
             CopyChat,
             ModIdHider,
             SmoothWorldLoading,
-            LobbyHopper,
             GreenhouseTimer,
             PhantomLeafSolver,
             PestESP,
@@ -110,21 +104,17 @@ object ModuleManager {
             Combat,
             NoRotate,
             WardrobeKeybinds,
-            BazaarFlipper,
             SecretTriggerbot,
             AutoCloseChest,
             PuzzleTriggerbot,
             StarMobESP,
             CustomESP,
             TerminalSolver,
-            TerminalTriggerbot,
-            CrystalHollowsStructureFinder,
-            GoldenDragonFinder,
-            CrystalHollowsMap
+            TerminalTriggerbot
         )
 
         // Its own config file (config/hxpaddons/addons/dungeon-map.json) instead of the shared
-        // hxpaddons-config.json, so the map layout/color settings can be copied to another install (or
+        // hxputils-config.json, so the map layout/color settings can be copied to another install (or
         // shared with someone else) on their own, without dragging every other module's settings along.
         // One-time carry-over of the "Dungeon Map" entry already sitting in the old shared file, so
         // existing users don't lose their configured layout/colors just from this split.
@@ -142,7 +132,7 @@ object ModuleManager {
     }
 
     /**
-     * Copies the "Dungeon Map" entry out of the old shared `hxpaddons-config.json` into the new, separate
+     * Copies the "Dungeon Map" entry out of the old shared `hxputils-config.json` into the new, separate
      * `addons/dungeon-map.json` the first time it runs (i.e. only while the new file doesn't exist yet) -
      * afterward the old entry is simply left stale in the shared file until that file's own next save,
      * which naturally drops it since [DungeonMap] is no longer part of that [ModuleConfig]'s modules.
@@ -150,7 +140,7 @@ object ModuleManager {
     private fun migrateDungeonMapConfig() {
         val newFile = File(HxPMod.configFile, "addons/dungeon-map.json")
         if (newFile.exists()) return
-        val oldFile = File(HxPMod.configFile, "hxpaddons-config.json")
+        val oldFile = File(HxPMod.configFile, "hxputils-config.json")
         if (!oldFile.exists()) return
 
         try {
