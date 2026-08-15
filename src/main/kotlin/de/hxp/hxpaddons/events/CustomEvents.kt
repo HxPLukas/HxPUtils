@@ -6,7 +6,6 @@ import de.hxp.hxpaddons.events.core.Event
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.world.item.ItemStack
 import de.hxp.hxpaddons.utils.render.RenderConsumer
-import de.hxp.hxpaddons.utils.skyblock.dungeon.terminals.terminalhandler.TerminalHandler
 import de.hxp.hxpaddons.utils.skyblock.dungeon.tiles.Room
 import net.fabricmc.fabric.api.client.rendering.v1.level.AbstractLevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
@@ -40,12 +39,6 @@ interface SecretPickupEvent : Event { // all are currently packet based but can 
     class Interact(val blockPos: BlockPos, val blockState: BlockState) : SecretPickupEvent
     class Item(val entity: ItemEntity) : SecretPickupEvent
     class Bat(val packet: ClientboundSoundPacket) : SecretPickupEvent
-}
-
-abstract class TerminalEvent(val terminal: TerminalHandler) : Event { // first 2 are packet based can use mixins
-    class Open(terminal: TerminalHandler) : TerminalEvent(terminal)
-    class Close(terminal: TerminalHandler) : TerminalEvent(terminal)
-    class Solve(terminal: TerminalHandler) : TerminalEvent(terminal)
 }
 
 interface TickEvent : Event {

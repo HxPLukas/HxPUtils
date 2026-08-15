@@ -1,15 +1,12 @@
 package de.hxp.hxpaddons.mixin.mixins;
 
-import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import de.hxp.hxpaddons.events.BlockInteractEvent;
 import de.hxp.hxpaddons.events.EntityInteractEvent;
 import de.hxp.hxpaddons.features.ModuleManager;
-import de.hxp.hxpaddons.features.impl.dungeon.TerminalSolver;
 import de.hxp.hxpaddons.features.impl.general.SmoothTransitionScreen;
 import de.hxp.hxpaddons.features.impl.general.SmoothWorldLoading;
-import de.hxp.hxpaddons.utils.skyblock.dungeon.terminals.TerminalUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.multiplayer.ServerReconfigScreen;
@@ -64,11 +61,5 @@ public abstract class MinecraftMixin {
     private void cancelEntityUse(CallbackInfo ci) {
         if (!(this.hitResult instanceof EntityHitResult entityHitResult)) return;
         if (new EntityInteractEvent(entityHitResult.getLocation(), entityHitResult.getEntity()).postAndCatch()) ci.cancel();
-    }
-
-    @ModifyExpressionValue(method = "resizeGui", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/OptionInstance;get()Ljava/lang/Object;"))
-    private Object hxp$modifyGuiScaleForTerminal(Object original) {
-        if (TerminalUtils.getCurrentTerm() != null && TerminalSolver.getTermSize() != (Integer) original) return TerminalSolver.getTermSize();
-        return original;
     }
 }
