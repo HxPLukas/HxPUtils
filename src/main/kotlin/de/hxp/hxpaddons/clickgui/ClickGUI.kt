@@ -104,10 +104,15 @@ object ClickGUI : Screen(Component.literal("Click GUI")) {
                 ?.map { ModuleButton(it) } ?: listOf()
         }
 
-    private fun visibleButtons(category: Category): List<ModuleButton> =
-        moduleButtonsByCategory[category].orEmpty().filter {
+    // While actively searching, ignores the passed category entirely and searches across every category's
+    // modules instead (on request - "dass er überall sucht und nicht nur in der kategorie") - with no query,
+    // falls back to the normal "just this category" browsing behavior.
+    private fun visibleButtons(category: Category): List<ModuleButton> {
+        val source = if (searchQuery.isBlank()) moduleButtonsByCategory[category].orEmpty() else moduleButtonsByCategory.values.flatten()
+        return source.filter {
             (ModuleManager.showWipModules || !it.module.isWip) && it.module.name.contains(searchQuery, true)
         }
+    }
 
     private fun selectedSettings() =
         selectedButton?.representableSettings?.filter { it.isVisible }.orEmpty()
