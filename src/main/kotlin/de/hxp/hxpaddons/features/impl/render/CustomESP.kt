@@ -407,8 +407,10 @@ object CustomESP : Module(
      * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
      * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
      * "Texture #2", ...) - both drawn in-world (readable from a distance) and printed once to chat, together
-     * with a full per-slot breakdown (item id + every raw signal found in that slot) the first time it's seen
-     * (copyable from there) via [discoveredTextures] - so the workflow is: turn on debug mode with Custom
+     * with the entity's own type/name (2026-08-16, on request, so a texture can be tied back to a specific
+     * entity/mob afterward rather than only ever "whatever was highlighted at the time") and a full per-slot
+     * breakdown (item id + every raw signal found in that slot) the first time it's seen (copyable from there)
+     * via [discoveredTextures] - so the workflow is: turn on debug mode with Custom
      * Texture selected, look at whatever should be highlighted, read the matching "Texture #N" off its
      * floating label, then find that same id in chat for the exact per-slot details to match on. If an entity
      * has equipped items but none carry any recognized signal, the per-slot item ids are still dumped (rather
@@ -427,12 +429,13 @@ object CustomESP : Module(
         val combined = labelFor(entity)
         val index = discoveredTextures.getOrPut(combined) {
             val next = discoveredTextures.size + 1
+            val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
             val details = equipped.joinToString(" | ") { (slot, stack) ->
                 val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
                 val signals = stack.disguiseSignals()
                 "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
             }
-            modMessage("§bCustom ESP debug: Texture #$next -> $details")
+            modMessage("§bCustom ESP debug: Texture #$next ($entityInfo) -> $details")
             next
         }
         return "Texture #$index"
