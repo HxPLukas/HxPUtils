@@ -1,6 +1,7 @@
 package de.hxp.hxpaddons.features.impl.skyblock
 
 import de.hxp.hxpaddons.HxPMod.mc
+import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.BooleanSetting
 import de.hxp.hxpaddons.events.WorldEvent
 import de.hxp.hxpaddons.events.core.on
@@ -38,6 +39,7 @@ import kotlin.jvm.optionals.getOrDefault
  * then silently reconciles the confirming [ClientboundPlayerPositionPacket] so the server can never snap the
  * camera to the direction it forces you to face after teleporting.
  */
+@WipModule
 object NoRotate : Module(
     name = "No Rotate",
     description = "Prevents the server from snapping your view when using teleport items.",
