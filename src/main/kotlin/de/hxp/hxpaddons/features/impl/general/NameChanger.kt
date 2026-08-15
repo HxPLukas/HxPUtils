@@ -38,8 +38,17 @@ import net.minecraft.network.chat.contents.PlainTextContents
  * untouched, and siblings are processed recursively - so formatting/hover/click events elsewhere in the
  * component survive intact.
  *
- * WIP: the floating name tag above your own head and the scoreboard also show your name but aren't touched
- * yet - those need their own dedicated mixins rather than either hook above.
+ * The floating name tag above your own head is hooked via a mixin into [net.minecraft.client.renderer.entity.EntityRenderer]'s
+ * `getNameTag`, restricted to `entity == mc.player` so it never touches other players'/mobs' name tags.
+ *
+ * Only matches the target name as a whole token, not a substring inside a longer name/word - e.g. with
+ * target "Lukas", "Lukas" and "xX_Lukas" both match but "Lukasstrasse" or "xLukasx" don't, since the
+ * characters immediately before/after the match must not themselves be name characters (letter/digit/`_`,
+ * the only characters Minecraft usernames can contain).
+ *
+ * WIP: the scoreboard sidebar also shows text but isn't touched yet - Hypixel draws it via team
+ * prefix/suffix wrapped around blank score-holder names (see [de.hxp.hxpaddons.utils.readPurseBalance]'s own
+ * doc) rather than your literal username, so it's unlikely to ever need a name here anyway.
  */
 @WipModule
 object NameChanger : Module(
@@ -76,23 +85,36 @@ object NameChanger : Module(
         return rebuiltOwn
     }
 
+    private fun isNameChar(c: Char) = c.isLetterOrDigit() || c == '_'
+
     private fun splitAndReplace(text: String, target: String, replacement: String, color: TextColor, ownStyle: Style): MutableComponent {
         var result: MutableComponent? = null
-        var remaining = text
+        var searchFrom = 0
+        var appendedUpTo = 0
         while (true) {
-            val idx = remaining.indexOf(target, ignoreCase = true)
-            if (idx < 0) {
-                val piece = Component.literal(remaining).withStyle(ownStyle)
-                result = result?.append(piece) ?: piece
-                break
+            val idx = text.indexOf(target, searchFrom, ignoreCase = true)
+            if (idx < 0) break
+            val matchEnd = idx + target.length
+            val boundedBefore = idx == 0 || !isNameChar(text[idx - 1])
+            val boundedAfter = matchEnd == text.length || !isNameChar(text[matchEnd])
+            if (!boundedBefore || !boundedAfter) {
+                searchFrom = idx + 1
+                continue
             }
-            if (idx > 0) {
-                val prefix = Component.literal(remaining.substring(0, idx)).withStyle(ownStyle)
+
+            if (idx > appendedUpTo) {
+                val prefix = Component.literal(text.substring(appendedUpTo, idx)).withStyle(ownStyle)
                 result = result?.append(prefix) ?: prefix
             }
             val replaced = Component.literal(replacement).withStyle(ownStyle.withColor(color))
             result = result?.append(replaced) ?: replaced
-            remaining = remaining.substring(idx + target.length)
+            appendedUpTo = matchEnd
+            searchFrom = matchEnd
+        }
+
+        if (appendedUpTo < text.length) {
+            val suffix = Component.literal(text.substring(appendedUpTo)).withStyle(ownStyle)
+            result = result?.append(suffix) ?: suffix
         }
         return result ?: Component.literal("").withStyle(ownStyle)
     }
