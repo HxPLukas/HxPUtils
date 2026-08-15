@@ -17,7 +17,6 @@ import de.hxp.hxpaddons.utils.skyblock.dungeon.DungeonUtils
 import de.hxp.hxpaddons.utils.skyblock.dungeon.MapColorScanner
 import de.hxp.hxpaddons.utils.skyblock.dungeon.NearbyRoomScanner
 import de.hxp.hxpaddons.utils.skyblock.dungeon.ScanUtils
-import de.hxp.hxpaddons.utils.skyblock.dungeon.terminals.TerminalUtils
 import de.hxp.hxpaddons.utils.ui.rendering.NVGPIPRenderer
 import de.hxp.hxpaddons.utils.ui.widget.CustomGUIImpl
 import kotlinx.coroutines.CoroutineScope
@@ -73,7 +72,7 @@ object HxPMod : ClientModInitializer {
         listOf(
             this, LocationUtils, TickTasks, KuudraUtils,
             SkyblockPlayer, ServerUtils, EventDispatcher,
-            DungeonListener, PartyUtils, TerminalUtils,
+            DungeonListener, PartyUtils,
             ScanUtils, DungeonUtils, SplitsManager,
             IrisCompatability, RenderBatchManager,
             ModuleManager, CustomGUIImpl,

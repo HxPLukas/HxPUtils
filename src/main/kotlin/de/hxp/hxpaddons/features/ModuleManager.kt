@@ -23,13 +23,10 @@ import de.hxp.hxpaddons.features.impl.dungeon.DungeonMap
 import de.hxp.hxpaddons.features.impl.dungeon.PuzzleTriggerbot
 import de.hxp.hxpaddons.features.impl.dungeon.SecretTriggerbot
 import de.hxp.hxpaddons.features.impl.dungeon.StarMobESP
-import de.hxp.hxpaddons.features.impl.dungeon.TerminalSolver
-import de.hxp.hxpaddons.features.impl.dungeon.TerminalTriggerbot
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
 import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
 import de.hxp.hxpaddons.features.impl.skyblock.BazaarFlipper
 import de.hxp.hxpaddons.features.impl.skyblock.Combat
-import de.hxp.hxpaddons.features.impl.skyblock.NoRotate
 import de.hxp.hxpaddons.features.impl.skyblock.TermAutoClicker
 import de.hxp.hxpaddons.features.impl.skyblock.Terminator
 import de.hxp.hxpaddons.features.impl.general.AutoDialogue
@@ -110,7 +107,6 @@ object ModuleManager {
             TermAutoClicker,
             AutoFish,
             Combat,
-            NoRotate,
             AutoLoadout,
             BazaarFlipper,
             SecretTriggerbot,
@@ -118,8 +114,6 @@ object ModuleManager {
             PuzzleTriggerbot,
             StarMobESP,
             CustomESP,
-            TerminalSolver,
-            TerminalTriggerbot,
             CrystalHollowsStructureFinder,
             GoldenDragonFinder,
             CrystalHollowsMap
