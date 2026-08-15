@@ -503,7 +503,9 @@ object CustomESP : Module(
      * text of all of them. Also, a raw skin texture value is a long base64 string Minecraft's chat doesn't
      * support click-drag-selecting anyway. Each signal now gets its own clickable line
      * ([ClickEvent.CopyToClipboard]) so what lands on the clipboard is always the exact, single raw value the
-     * matcher actually compares against.
+     * matcher actually compares against - broadened the same day to every field in this dump, not just
+     * Skin/Model ID (on request - "das er mir bei allen copy to clipboard anbietet und nicht nur skin id"),
+     * since the same manual-copy-error risk applies to any of them.
      */
     fun dumpClosestMatchedMob() {
         val player = mc.player
@@ -518,33 +520,40 @@ object CustomESP : Module(
         }
 
         modMessage("§6=== Closest ESP'd Mob (${"%.2f".format(player.distanceTo(closest))} blocks) ===")
-        modMessage("§7Entity Type: §f${BuiltInRegistries.ENTITY_TYPE.getKey(closest.type)}")
-        modMessage("§7Name: §f${closest.name.string.noControlCodes}")
+        val entityTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(closest.type).toString()
+        modMessage(copyableLine("§7Entity Type: §f$entityTypeId", entityTypeId))
+        val entityName = closest.name.string.noControlCodes
+        modMessage(copyableLine("§7Name: §f$entityName", entityName))
 
         val living = closest as? LivingEntity
         val skinIds = closest.disguiseSignals
         when {
             skinIds.isEmpty() -> modMessage("§7Skin/Model ID: §f(none found)")
-            skinIds.size == 1 -> modMessage(copyableSkinIdLine("§7Skin/Model ID: §f${skinIds[0]}", skinIds[0]))
+            skinIds.size == 1 -> modMessage(copyableLine("§7Skin/Model ID: §f${skinIds[0]}", skinIds[0]))
             else -> {
                 modMessage("§7Skin/Model ID §7(${skinIds.size} separate signals - click one to copy just that value; pasting them joined together won't match anything):")
-                skinIds.forEachIndexed { i, id -> modMessage(copyableSkinIdLine("§8  #${i + 1}: §f$id", id)) }
+                skinIds.forEachIndexed { i, id -> modMessage(copyableLine("§8  #${i + 1}: §f$id", id)) }
             }
         }
 
-        fun slotDisplay(slot: EquipmentSlot): String {
+        fun slotLine(label: String, slot: EquipmentSlot) {
             val stack = living?.getItemBySlot(slot)
-            return if (stack == null || stack.isEmpty) "(none)" else stack.hoverName.string.noControlCodes
+            if (stack == null || stack.isEmpty) {
+                modMessage("§7$label: §f(none)")
+            } else {
+                val itemName = stack.hoverName.string.noControlCodes
+                modMessage(copyableLine("§7$label: §f$itemName", itemName))
+            }
         }
-        modMessage("§7Item Held: §f${slotDisplay(EquipmentSlot.MAINHAND)}")
-        modMessage("§7Helmet: §f${slotDisplay(EquipmentSlot.HEAD)}")
-        modMessage("§7Chestplate: §f${slotDisplay(EquipmentSlot.CHEST)}")
-        modMessage("§7Leggings: §f${slotDisplay(EquipmentSlot.LEGS)}")
-        modMessage("§7Boots: §f${slotDisplay(EquipmentSlot.FEET)}")
+        slotLine("Item Held", EquipmentSlot.MAINHAND)
+        slotLine("Helmet", EquipmentSlot.HEAD)
+        slotLine("Chestplate", EquipmentSlot.CHEST)
+        slotLine("Leggings", EquipmentSlot.LEGS)
+        slotLine("Boots", EquipmentSlot.FEET)
     }
 
-    /** One [dumpClosestMatchedMob] Skin/Model ID line, clickable to copy exactly [rawValue] (not [displayText]'s formatting) to the clipboard - see that function's own doc for why this matters. */
-    private fun copyableSkinIdLine(displayText: String, rawValue: String): Component =
+    /** One [dumpClosestMatchedMob] chat line, clickable to copy exactly [rawValue] (not [displayText]'s formatting) to the clipboard - see that function's own doc for why this matters. */
+    private fun copyableLine(displayText: String, rawValue: String): Component =
         Component.literal("$displayText §a[click to copy]").withStyle {
             it.withClickEvent(ClickEvent.CopyToClipboard(rawValue))
                 .withHoverEvent(HoverEvent.ShowText(Component.literal("§6Click to copy this exact value.")))
