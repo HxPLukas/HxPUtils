@@ -16,7 +16,6 @@ import de.hxp.hxpaddons.features.Module
 import de.hxp.hxpaddons.utils.Color
 import de.hxp.hxpaddons.utils.Color.Companion.multiplyAlpha
 import de.hxp.hxpaddons.utils.Colors
-import de.hxp.hxpaddons.utils.modMessage
 import de.hxp.hxpaddons.utils.noControlCodes
 import de.hxp.hxpaddons.utils.render.EntityOutlineESP
 import de.hxp.hxpaddons.utils.render.drawFilledBox
@@ -26,11 +25,8 @@ import de.hxp.hxpaddons.utils.renderBoundingBox
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.EquipmentSlot
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.decoration.ArmorStand
 import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.EntityHitResult
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.max
@@ -352,48 +348,5 @@ object CustomESP : Module(
     private fun RenderEvent.Extract.drawEntityBox(aabb: AABB) {
         drawFilledBox(aabb, espColor.multiplyAlpha(boxOpacity / 100f), depth = false)
         drawWireFrameBox(aabb, espColor, thickness = boxOutlineWidth.toFloat(), depth = false)
-    }
-
-    /**
-     * `/hxp esp dump` - on request, to investigate whether some field on a mob's own entity identifies it
-     * (e.g. as "Crypt Ghoul") earlier than its nametag-holder ArmorStand becomes available (see this module's
-     * own history of that exact problem) - "ich weiß dass es irgendwie über fields geht ich weiß nur nicht wie
-     * genau". Dumps everything readily inspectable about whatever entity is currently under the crosshair to
-     * chat: type, UUID, distance, custom-name state, pose, equipment (all [EquipmentSlot]s, not just
-     * hand/armor named accessors, so it also covers body armor on horses/wolves etc.), and - the actual answer
-     * to "which fields" - every entry [net.minecraft.network.syncher.SynchedEntityData.getNonDefaultValues]
-     * returns, i.e. every synced entity-data field currently holding a non-default value, by raw id and
-     * value. That's the complete set of data this client has received about the entity at all; if "Crypt
-     * Ghoul" doesn't show up as a value anywhere in that dump while looking at the mob (not the ArmorStand)
-     * from range, no field distinguishes it early - the server simply hasn't sent that information yet.
-     */
-    fun dumpLookedAtEntity() {
-        val target = (mc.hitResult as? EntityHitResult)?.entity
-        if (target == null) {
-            modMessage("§cNo entity under your crosshair right now - look directly at one and try again.")
-            return
-        }
-
-        modMessage("§6=== Entity Dump: ${target.type.description.string.noControlCodes} ===")
-        modMessage("§7Type: §f${BuiltInRegistries.ENTITY_TYPE.getKey(target.type)}")
-        modMessage("§7UUID: §f${target.uuid}")
-        modMessage("§7Distance: §f${"%.2f".format(mc.player?.distanceTo(target) ?: -1.0)}")
-        modMessage("§7hasCustomName: §f${target.hasCustomName()} §7name: §f${target.name.string.noControlCodes}")
-        modMessage("§7Pose: §f${target.pose}")
-
-        if (target is LivingEntity) {
-            modMessage("§7Health: §f${target.health}/${target.maxHealth}")
-            val equipment = EquipmentSlot.entries.mapNotNull { slot ->
-                val stack = target.getItemBySlot(slot)
-                if (stack.isEmpty) null else "$slot=${stack.hoverName.string.noControlCodes}"
-            }
-            modMessage(if (equipment.isEmpty()) "§7Equipment: §fnone" else "§7Equipment: §f${equipment.joinToString(", ")}")
-        }
-
-        val values = target.entityData.nonDefaultValues.orEmpty()
-        modMessage("§7Synced data (${values.size} non-default entries):")
-        for (value in values) {
-            modMessage("§8  #${value.id()}: §f${value.value()}")
-        }
     }
 }
