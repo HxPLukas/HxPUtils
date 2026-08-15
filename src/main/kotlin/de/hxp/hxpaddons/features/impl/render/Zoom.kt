@@ -9,7 +9,6 @@ import de.hxp.hxpaddons.events.core.on
 import de.hxp.hxpaddons.features.Category
 import de.hxp.hxpaddons.features.Module
 import org.lwjgl.glfw.GLFW
-import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /**
@@ -17,20 +16,23 @@ import kotlin.math.sign
  * actually sitting on the right entity from a distance without needing to physically walk closer. Not the
  * usual press-to-toggle keybind every other module's [key][Module.key] uses (see [de.hxp.hxpaddons.events.InputEvent],
  * fired once on press only, no release signal) - [zoomKey] is its own explicit [KeybindSetting] (same idea as
- * [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s `combatKey`/`rodKey`) polled every tick via
- * [isDown] instead, so holding/releasing can actually be told apart.
+ * [de.hxp.hxpaddons.features.impl.skyblock.Combat]'s `combatKey`/`rodKey`) polled every tick via [isDown]
+ * instead, so holding/releasing can actually be told apart.
  *
- * Drives the same [net.minecraft.client.Options.fov] slider vanilla's own FOV option uses (restoring the
- * exact pre-zoom value the moment the key is released) rather than hooking into GameRenderer's FOV
- * computation directly - in this Minecraft version that computation doesn't even live in GameRenderer as an
- * isolated method to hook anymore, whereas driving the option itself works regardless of wherever it's
- * actually consumed.
+ * Overrides [net.minecraft.client.Camera]'s own per-frame FOV computation directly (see
+ * [de.hxp.hxpaddons.mixin.mixins.CameraMixin], injecting `calculateFov`'s return value) rather than driving
+ * the persisted [net.minecraft.client.Options.fov] slider - that option is backed by a plain Java `Integer`
+ * clamped to vanilla's own [30, 110] range for its *codec* (irrelevant here, but the type itself can't
+ * represent anything below FOV 1 meaningfully, and going lower than that on an integer scale is a dead end).
+ * [Camera.calculateFov] works in raw `float`, recomputed fresh every frame, so overriding its return value
+ * lets zoom go arbitrarily far in (fractional FOV, e.g. 0.5) with no such floor, and never touches - let
+ * alone persists - the real FOV option at all.
  *
  * While actively zoomed, the mouse wheel is intercepted (see [de.hxp.hxpaddons.mixin.mixins.MouseHandlerMixin],
  * `onScroll`) to adjust the zoom level further instead of its usual hotbar-slot-switching behavior - scroll
- * up to zoom in further, down to zoom back out, clamped between [minFov] and the FOV that was active right
- * before the key was pressed. Only intercepts scroll while actually zoomed and no screen is open, so
- * inventories/chat/the Click GUI keep scrolling normally, same as when the key isn't held at all.
+ * up to zoom in further, down to zoom back out, clamped between [minFov] and [startFov]. Only intercepts
+ * scroll while actually zoomed and no screen is open, so inventories/chat/the Click GUI keep scrolling
+ * normally, same as when the key isn't held at all.
  */
 object Zoom : Module(
     name = "Zoom",
@@ -38,41 +40,36 @@ object Zoom : Module(
     category = Category.RENDER
 ) {
     private val zoomKey by KeybindSetting("Zoom Key", GLFW.GLFW_KEY_UNKNOWN, desc = "Hold to zoom in, release to zoom back out.")
-    private val startFov by NumberSetting("Start FOV", 30, 1, 90, 1, desc = "FOV as soon as the key is pressed, before any scrolling.")
-    private val minFov by NumberSetting("Min FOV", 1, 1, 90, 1, desc = "The lowest FOV scrolling further in can reach.")
-    private val scrollStep by NumberSetting("Scroll Step", 3, 1, 20, 1, desc = "How much FOV changes per scroll notch.")
+    private val startFov by NumberSetting("Start FOV", 20.0, 0.1, 90.0, 0.5, desc = "FOV as soon as the key is pressed, before any scrolling.")
+    private val minFov by NumberSetting("Min FOV", 0.5, 0.1, 90.0, 0.1, desc = "The lowest FOV scrolling further in can reach - no floor beyond the setting's own range, unlike vanilla's FOV slider.")
+    private val scrollStep by NumberSetting("Scroll Step", 1.0, 0.1, 20.0, 0.1, desc = "How much FOV changes per scroll notch.")
 
-    private var preZoomFov: Int? = null
-    private var currentFov: Int = 0
+    private var currentFov: Float? = null
     private var wasHeld = false
 
     override fun onDisable() {
         super.onDisable()
-        stopZoom()
+        currentFov = null
+        wasHeld = false
     }
 
     init {
         on<TickEvent.End> {
-            if (!enabled) return@on
+            if (!enabled) {
+                currentFov = null
+                wasHeld = false
+                return@on
+            }
             val held = zoomKey.isDown()
-            if (held && !wasHeld) startZoom()
-            else if (!held && wasHeld) stopZoom()
+            if (held && !wasHeld) currentFov = startFov.toFloat()
+            else if (!held && wasHeld) currentFov = null
             wasHeld = held
         }
     }
 
-    private fun startZoom() {
-        val original = mc.options.fov().get()
-        preZoomFov = original
-        currentFov = startFov.toInt().coerceIn(minFov.toInt(), original)
-        mc.options.fov().set(currentFov)
-    }
-
-    private fun stopZoom() {
-        preZoomFov?.let { mc.options.fov().set(it) }
-        preZoomFov = null
-        wasHeld = false
-    }
+    /** Read every frame by [de.hxp.hxpaddons.mixin.mixins.CameraMixin] - null means "not zoomed, leave FOV alone". */
+    @JvmStatic
+    fun currentFovOverride(): Float? = currentFov
 
     /**
      * Called from [de.hxp.hxpaddons.mixin.mixins.MouseHandlerMixin]'s `onScroll` injection - returns true if
@@ -81,11 +78,10 @@ object Zoom : Module(
      */
     @JvmStatic
     fun onScroll(deltaY: Double): Boolean {
-        val original = preZoomFov ?: return false
+        val fov = currentFov ?: return false
         if (mc.screen != null) return false
-        val step = (sign(deltaY) * scrollStep.toDouble()).roundToInt()
-        currentFov = (currentFov - step).coerceIn(minFov.toInt(), original)
-        mc.options.fov().set(currentFov)
+        val step = (sign(deltaY) * scrollStep).toFloat()
+        currentFov = (fov - step).coerceIn(minFov.toFloat(), startFov.toFloat())
         return true
     }
 }
