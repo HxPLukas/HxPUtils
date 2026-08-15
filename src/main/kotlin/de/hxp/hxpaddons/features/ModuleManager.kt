@@ -26,11 +26,11 @@ import de.hxp.hxpaddons.features.impl.dungeon.StarMobESP
 import de.hxp.hxpaddons.features.impl.dungeon.TerminalSolver
 import de.hxp.hxpaddons.features.impl.dungeon.TerminalTriggerbot
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
+import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
 import de.hxp.hxpaddons.features.impl.skyblock.Combat
 import de.hxp.hxpaddons.features.impl.skyblock.NoRotate
 import de.hxp.hxpaddons.features.impl.skyblock.TermAutoClicker
 import de.hxp.hxpaddons.features.impl.skyblock.Terminator
-import de.hxp.hxpaddons.features.impl.skyblock.WardrobeKeybinds
 import de.hxp.hxpaddons.features.impl.general.AutoDialogue
 import de.hxp.hxpaddons.features.impl.general.ChatFilter
 import de.hxp.hxpaddons.features.impl.general.CompactChat
@@ -103,7 +103,7 @@ object ModuleManager {
             AutoFish,
             Combat,
             NoRotate,
-            WardrobeKeybinds,
+            AutoLoadout,
             SecretTriggerbot,
             AutoCloseChest,
             PuzzleTriggerbot,
