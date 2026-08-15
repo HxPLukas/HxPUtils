@@ -44,26 +44,27 @@ import kotlin.math.max
 /**
  * General-purpose through-walls entity ESP, unlike [de.hxp.hxpaddons.features.impl.dungeon.StarMobESP]/
  * [de.hxp.hxpaddons.features.impl.garden.PestESP] (both hardcoded to a fixed mob list and a specific island/
- * dungeon context) - matches any entity in the loaded world against a player-typed, comma-separated list, by
- * either its Minecraft entity type ([matchMode] "Entity Type") or its current display name/nametag
- * ("Name Tag"), same visual configuration (Outline/Box, opacity, box width) as those two modules. Originally
- * shipped as "Entity ESP" (2026-08-13), renamed to "Custom ESP" the same day on request.
+ * dungeon context) - matches any entity in the loaded world against [targetProfiles], same visual configuration
+ * (Outline/Box, opacity, box width) as those two modules. Originally shipped as "Entity ESP" (2026-08-13),
+ * renamed to "Custom ESP" the same day on request.
  *
- * [ignoreEntityNames] (2026-08-13, on request - the inverse of [entityNames], "wenn nichts eingegeben ist oder
- * es so weit matchen würde er trotzdem geht das ich die ignoren lassen kann") is a blocklist checked BEFORE
- * [entityNames]/debug mode - a match here excludes the entity even if it would otherwise have matched
- * [entityNames] or been swept in by the empty-list highlight-everything debug mode, so it can carve out
- * exceptions from either.
+ * Originally matched a single player-typed comma-separated "Entity Names" list (plus an "Ignore Entity Names"
+ * blocklist and a "Match Mode" selector choosing whether that list matched entity type, name tag, or disguise
+ * signal) - replaced entirely (2026-08-16, on request - "erweitere den esp so dass ich wie im chat filter ein
+ * neues gui habe ... entferne jetzt die beiden alten eingabefelder für entity und ignore entity ... es soll
+ * nurnoch über das neue laufen") by [targetProfiles], which can match several independent fields (type, name,
+ * skin/model id, held item, per-armor-slot) at once instead of one plain text list - see [TargetProfile]'s own
+ * doc for the full matching rules.
  *
- * Debug mode ([entityNames] left empty): highlights literally every entity instead of filtering. With
+ * Debug mode ([targetProfiles] empty): highlights literally every entity instead of filtering. With
  * [showEntityNames] also on, each entity's own name/type is additionally drawn as floating text above it (see
- * [drawText]) - lets a player identify an unfamiliar entity's exact name/type before adding it to the list, on
+ * [drawText]) - lets a player identify an unfamiliar entity's exact name/type before adding a profile for it, on
  * request ("ob sachen bei denen man sich unsicher ist wie das entity heißt auch espn zu können"). 2026-08-13:
  * [showEntityNames] originally only applied in debug mode (split out into its own explicit toggle on request -
  * "es soll nicht immer so sein sondern nur wenn das feld leer ist und es dann da eingestellt ist"); broadened
  * back the same way 2026-08-16 on request ("hinzufügen das er ... darüber den namen anzeigt", e.g. searching
  * for "Treasure Hunter" and seeing that name drawn above whatever it matched) - it now shows a name/type label
- * above ANY highlighted entity, whether that's debug mode's highlight-everything or a real filtered search.
+ * above ANY highlighted entity, whether that's debug mode's highlight-everything or a real filtered match.
  * [labelSize] (2026-08-13, on request - "die namen von den entity in der größe verändern") is a user-controlled multiplier on top of the
  * distance-based auto-scaling both this label and the particle debug label ([particleDebugShowNames]) already
  * use (see [labelScale]) - shared by both rather than two separate size settings.
@@ -90,7 +91,7 @@ import kotlin.math.max
  * server-sent particles ([net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket], caught via
  * [onReceive] - already-existing generic packet-event infrastructure, no new mixin needed) matching
  * [particleTypes] (registry name, e.g. "crit"), same [espColor]/[currentScanDistance] as entity matching. An
- * empty [particleTypes] highlights every particle instead, same debug-style convention [entityNames] already
+ * empty [particleTypes] highlights every particle instead, same debug-style convention debug mode already
  * uses - initially left out on the assumption that particles' much higher volume would make that a spam/perf
  * problem, then added back the same day on request ("auch wenn er dann viele hat aber man kann particles ja
  * togglen dann ist das ja egal und trotzdem um neue sachen zu machen hilfreich" - Particle ESP is its own
@@ -120,49 +121,43 @@ import kotlin.math.max
  * [ignoreArmorStandVisual] (on by default) before ever reaching the render pass, making the match look like
  * it never fired.
  *
- * Custom Texture match mode (2026-08-16, on request - "kann man die auch irgendwie scannen", after explaining
- * how Hypixel commonly disguises a mob/NPC with a player-head item carrying a custom skin instead of a
- * readable name, e.g. Odonata-style hidden mobs). Originally just the equipped `HEAD` slot's skull skin
- * texture (see [de.hxp.hxpaddons.utils.texture]) - broadened the same day after live testing against Odonata
- * specifically showed "no head texture" even though it visibly renders as something other than particles,
- * meaning it isn't a skull-in-the-HEAD-slot disguise at all. [disguiseSignals] now checks every equipped slot
- * (not just HEAD) for any of three possible signal types: skull skin texture, `CustomModelData` strings, or
- * an `ItemModel` identifier - whichever mechanism Hypixel actually used, without needing to already know
- * which one in advance. Any matched value is just as reliable a match key as a name (identical every time
+ * Custom Texture ("Skin/Model ID") matching (2026-08-16, on request - "kann man die auch irgendwie scannen",
+ * after explaining how Hypixel commonly disguises a mob/NPC with a player-head item carrying a custom skin
+ * instead of a readable name, e.g. Odonata-style hidden mobs). Originally just the equipped `HEAD` slot's skull
+ * skin texture (see [de.hxp.hxpaddons.utils.texture]) - broadened the same day after live testing against
+ * Odonata specifically showed "no head texture" even though it visibly renders as something other than
+ * particles, meaning it isn't a skull-in-the-HEAD-slot disguise at all. [disguiseSignals] now checks every
+ * equipped slot (not just HEAD) for any of three possible signal types: skull skin texture, `CustomModelData`
+ * strings, or an `ItemModel` identifier - whichever mechanism Hypixel actually used, without needing to already
+ * know which one in advance. Any matched value is just as reliable a match key as a name (identical every time
  * that exact disguise is worn), and equipment data isn't necessarily gated behind the same close-range
  * requirement Hypixel applies to some nametags. Since the combined value can be long/unreadable and is
- * impossible to copy out of rendered 3D world text, [logDiscoveredTexture] substitutes a short "Texture #N" id for
- * the floating label and chat-dumps a full per-slot breakdown (item id + every signal found, or "no signal"
+ * impossible to copy out of rendered 3D world text, [logTextureDiscovery]/[logDiscoveredTexture] substitutes a
+ * short "Texture #N" id and chat-dumps a full per-slot breakdown (item id + every signal found, or "no signal"
  * if an equipped item's disguise mechanism still isn't one of the three recognized types) the first time each
- * distinct combination is seen, so the actual copy/paste-into-Entity-Names step happens via chat instead.
+ * distinct combination is seen, so the actual copy/paste-into-a-profile's-Skin/Model-ID-field step happens via
+ * chat instead. This used to be a dedicated "Custom Texture" Match Mode option; now that matching runs entirely
+ * through [targetProfiles] instead of a Match Mode selector, it's just a standalone debug toggle.
  *
  * Entirely unverified live - first time this exact matching+labeling combination gets exercised.
  */
 object CustomESP : Module(
     name = "Custom ESP",
-    description = "Highlights entities (and optionally particles) matching a name/type list through walls - leave Entity Names empty to highlight and label everything.",
+    description = "Highlights entities (and optionally particles) matching a saved Target Profile through walls - leave the profile list empty to highlight and label everything.",
     category = Category.RENDER
 ) {
-    private val matchMode by SelectorSetting(
-        "Match Mode", "Entity Type", listOf("Entity Type", "Name Tag", "Custom Texture"),
-        desc = "Whether the Entity Names list is matched against each entity's Minecraft type (e.g. \"Zombie\"), its current display name/nametag, or any visual disguise signal (skull skin texture, resource-pack model id) found across all of its equipped items - for entities disguised via a custom item instead of a readable name, e.g. hidden mobs/NPCs."
-    )
-    private val entityNames by StringSetting(
-        "Entity Names", "", length = 256,
-        desc = "Comma-separated list to match (e.g. \"Zombie, Skeleton\", or a raw value from the Custom Texture debug dump) - matched as a case-insensitive substring against whichever Match Mode picks. Leave empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called, or which texture/model id it carries in Custom Texture mode."
-    )
-    private val ignoreEntityNames by StringSetting(
-        "Ignore Entity Names", "", length = 256,
-        desc = "Comma-separated list to NEVER highlight, matched the same way (case-insensitive substring, same Match Mode) as Entity Names - takes priority over everything else, including a match in Entity Names itself and the empty-list highlight-everything debug mode."
-    )
     val targetProfiles by ListSetting<TargetProfile, MutableList<TargetProfile>>("Target Profiles", mutableListOf())
 
     init {
         registerSetting(ActionSetting(
             "Manage Target Profiles",
-            "Opens a manager for advanced multi-field targets (entity type, name, skin/model id, held item, armor) - independent of Entity Names/Match Mode above. An entity matches a profile if ALL of that profile's filled-in fields match; leave a field blank to ignore it. Highlighted if it matches ANY saved profile."
+            "Opens a manager for advanced multi-field targets (entity type, name, skin/model id, held item, helmet/chestplate/leggings/boots). An entity matches a profile if ALL of that profile's filled-in fields match; leave a field blank to ignore it. Highlighted if it matches ANY saved profile. Leave the list empty to highlight (and label) every entity instead - useful for figuring out what an unfamiliar entity is actually called."
         ) { schedule(0) { mc.setScreen(TargetProfilesScreen) } })
     }
+    private val logTextureDiscovery by BooleanSetting(
+        "Debug: Log Discovered Textures", false,
+        desc = "Dev-logs (see Developer Message) every distinct visual disguise signal (skull skin texture, resource-pack model id) found across every highlighted entity's equipped items the first time it's seen, as \"Texture #N\" - for entities disguised via a custom item instead of a readable name, e.g. hidden mobs/NPCs. Use this to find the raw value to paste into a Target Profile's Skin/Model ID field."
+    )
     private val scanDistanceInput by StringSetting(
         "Scan Distance", "64", length = 10,
         desc = "Maximum distance (in blocks) an entity can be from you to get matched/highlighted - type any number, no fixed upper limit."
@@ -205,11 +200,9 @@ object CustomESP : Module(
     private val boxOpacity by NumberSetting("Box Opacity", 50, 0, 100, 1, unit = "%", desc = "Opacity of the box's fill.").withDependency { espType == ESP_TYPE_BOX }
     private val espColor by ColorSetting("ESP Color", Colors.MINECRAFT_RED, true, desc = "The color matched entities are highlighted in.")
 
-    // Indices into the "ESP Type"/"Match Mode" SelectorSettings' option lists above.
+    // Indices into the "ESP Type" SelectorSetting's option list above.
     private const val ESP_TYPE_OUTLINE = 0
     private const val ESP_TYPE_BOX = 1
-    private const val MATCH_MODE_TYPE = 0
-    private const val MATCH_MODE_TEXTURE = 2
 
     /** [scanDistanceInput]'s fallback if the typed text doesn't parse as a number at all. */
     private const val DEFAULT_SCAN_DISTANCE = 64.0
@@ -241,12 +234,12 @@ object CustomESP : Module(
             if (!enabled) return@on
             val player = mc.player ?: return@on
 
-            val names = entityNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            val ignoreNames = ignoreEntityNames.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            // Only "highlight everything" while NEITHER matching path has anything specified - a non-empty
-            // Target Profiles list (even with Entity Names left blank) means the profiles are deliberately
-            // doing the filtering instead, not "match nothing so show everything".
-            debugModeActive = names.isEmpty() && targetProfiles.isEmpty()
+            // Only "highlight everything" while no Target Profiles are configured yet - same debug-style
+            // convention the old empty-Entity-Names search used to have (see [[project_custom_esp]]), now
+            // driven entirely by Target Profiles (2026-08-16, on request - "es soll nurnoch über das neue
+            // laufen", removing the older single Entity Names/Ignore Entity Names text-list matching entirely
+            // now that profiles cover everything that could).
+            debugModeActive = targetProfiles.isEmpty()
             val maxDistSq = currentScanDistance() * currentScanDistance()
 
             entities.clear()
@@ -254,19 +247,11 @@ object CustomESP : Module(
             mc.level?.entitiesForRendering()?.forEach { e ->
                 if (e === player || !e.isAlive) return@forEach
                 if (player.distanceToSqr(e) > maxDistSq) return@forEach
-                val label = labelFor(e)
-                // Ignore list wins over everything else - a match here excludes the entity even if it also
-                // matched Entity Names, or would've been swept in by the empty-list debug/highlight-everything
-                // mode (on request - "wenn nichts eingegeben ist oder es so weit matchen würde er trotzdem
-                // geht das ich die ignoren lassen kann").
-                if (ignoreNames.any { name -> label.contains(name, ignoreCase = true) }) return@forEach
-                val matchedBySearch = names.any { name -> label.contains(name, ignoreCase = true) }
-                // Target Profiles (see TargetProfile.kt's own doc) - an entirely separate, independent
-                // matching path from Entity Names/Match Mode above: each profile can constrain several
-                // fields (type, name, skin/model id, held item, armor) at once, all of which must match
-                // together, and an entity is highlighted if it satisfies ANY one saved profile.
+                // Target Profiles (see TargetProfile.kt's own doc): each profile can constrain several
+                // fields (type, name, skin/model id, held item, per-armor-slot) at once, all of which must
+                // match together, and an entity is highlighted if it satisfies ANY one saved profile.
                 val matchedByProfile = targetProfiles.any { it.matches(e) }
-                if (debugModeActive || matchedBySearch || matchedByProfile) {
+                if (debugModeActive || matchedByProfile) {
                     entities.add(e)
                     // Dungeon-style mobs (e.g. "Crypt Ghoul") carry their real display name on a separate
                     // invisible ArmorStand riding just above them, not on the mob entity itself - same
@@ -282,7 +267,7 @@ object CustomESP : Module(
                     // filtering out decorative ArmorStands from debug/highlight-everything mode, not this
                     // explicit name match. A Target Profiles match on an ArmorStand resolves too - profiles
                     // exist specifically for this exact "named mob whose real entity carries nothing" case.
-                    if (e is ArmorStand && (matchedByProfile || matchMode != MATCH_MODE_TYPE)) {
+                    if (e is ArmorStand && matchedByProfile) {
                         forceVisibleArmorStands.add(e)
                         resolveMobBelow(e)?.let { entities.add(it) }
                     }
@@ -333,13 +318,9 @@ object CustomESP : Module(
                     else drawEntityBox(entity.renderBoundingBox)
                 }
 
+                if (logTextureDiscovery) logDiscoveredTexture(entity)
+
                 if (showEntityNames && !(isArmorStand && ignoreArmorStandLabels)) {
-                    // Custom Texture mode still dev-logs newly discovered textures (see logDiscoveredTexture) for
-                    // investigation purposes, but the floating label itself is always just the entity's plain
-                    // name/type now (on request - "er soll mir den mob name drüber anzeigen ... niemals no
-                    // equipped items oder so das ist unnötige informationen nur den name") regardless of
-                    // Match Mode, instead of logDiscoveredTexture's Texture-mode-specific placeholder text.
-                    if (matchMode == MATCH_MODE_TEXTURE) logDiscoveredTexture(entity)
                     val box = entity.renderBoundingBox
                     val labelPos = Vec3((box.minX + box.maxX) / 2.0, box.maxY + 0.3, (box.minZ + box.maxZ) / 2.0)
                     val dist = player?.position()?.distanceTo(labelPos) ?: 0.0
@@ -394,45 +375,27 @@ object CustomESP : Module(
     }
 
     /**
-     * The entity's type name (e.g. "Zombie") in [MATCH_MODE_TYPE], every [de.hxp.hxpaddons.utils.disguiseSignals]
-     * value found across ALL of its equipped slots (not just [EquipmentSlot.HEAD] - a disguise doesn't have to
-     * be a custom-skin skull; Odonata turned out to have none, see [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP]'s own doc for the full story)
-     * joined together in [MATCH_MODE_TEXTURE] (empty string if it's not a [LivingEntity], or has no equipped
-     * item carrying any signal at all - matches nothing, same as any other blank search term would), its
-     * current display name/nametag otherwise - this is the value actually compared against
-     * [entityNames]/[ignoreEntityNames]. For the debug-mode floating label specifically, see [logDiscoveredTexture]
-     * instead - the raw joined value can be long/unreadable and impossible to copy back out of 3D world text.
+     * Called purely for its side effect when [logTextureDiscovery] is on - assigns each distinct combined
+     * [de.hxp.hxpaddons.utils.disguiseSignals] value seen across an entity's equipped items a short sequential
+     * id ("Texture #1", "Texture #2", ...) via [discoveredTextures] and logs it once via [devMessage] (only
+     * visible with "Developer Message" on) the first time it's seen - moved off [modMessage]/regular chat
+     * (2026-08-16, on request - originally spammed regular chat during the Odonata investigation ("er spammt
+     * mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then re-added as a dev-only log instead
+     * of removed outright ("mach den dump wieder rein bei developer message")) - stays out of the way normally
+     * but is still there to turn on when actually investigating a new disguise/hunting for a Skin/Model ID
+     * value to paste into a Target Profile.
      */
-    private fun labelFor(entity: Entity): String = when (matchMode) {
-        MATCH_MODE_TYPE -> entity.type.description.string
-        MATCH_MODE_TEXTURE -> (entity as? LivingEntity)
-            ?.let { living -> EquipmentSlot.entries.flatMap { living.getItemBySlot(it).disguiseSignals } }
-            ?.joinToString("|").orEmpty()
-        else -> entity.name.string.noControlCodes
-    }
-
-    /**
-     * Called purely for its side effect in [MATCH_MODE_TEXTURE] - the floating label itself is always just
-     * the entity's plain name/type now (see the render pass above), this only assigns each distinct combined
-     * signal value seen a short sequential id ("Texture #1", "Texture #2", ...) via [discoveredTextures] and
-     * logs it once via [devMessage] (only visible with "Developer Message" on) the first time it's seen -
-     * moved off [modMessage]/regular chat (2026-08-16, on request - originally spammed regular chat during the
-     * Odonata investigation ("er spammt mir immernoch mein chat voll er muss jetzt nichts mehr loggen"), then
-     * re-added as a dev-only log instead of removed outright ("mach den dump wieder rein bei developer
-     * message")) - stays out of the way normally but is still there to turn on when actually investigating a
-     * new disguise.
-     */
-    private fun logDiscoveredTexture(entity: Entity): String {
-        if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
-        val living = entity as? LivingEntity ?: return "(not a living entity)"
+    private fun logDiscoveredTexture(entity: Entity) {
+        val living = entity as? LivingEntity ?: return
         val equipped = EquipmentSlot.entries.mapNotNull { slot ->
             val stack = living.getItemBySlot(slot)
             if (stack.isEmpty) null else slot to stack
         }
-        if (equipped.isEmpty()) return "(no equipped items)"
+        if (equipped.isEmpty()) return
 
-        val combined = labelFor(entity)
-        val index = discoveredTextures.getOrPut(combined) {
+        val combined = equipped.flatMap { (_, stack) -> stack.disguiseSignals }.joinToString("|")
+        if (combined.isBlank()) return
+        discoveredTextures.getOrPut(combined) {
             val next = discoveredTextures.size + 1
             val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
             val details = equipped.joinToString(" | ") { (slot, stack) ->
@@ -443,7 +406,6 @@ object CustomESP : Module(
             devMessage("Custom ESP debug: Texture #$next ($entityInfo) -> $details")
             next
         }
-        return "Texture #$index"
     }
 
     /** [drawText]'s scale for a label [dist] blocks away - auto-scales with distance to stay a roughly constant apparent size (same formula [de.hxp.hxpaddons.features.impl.mining.CrystalHollowsStructureFinder]/[de.hxp.hxpaddons.features.impl.mining.GoldenDragonFinder] already use), times [labelSize] on top as a user-controlled multiplier. */

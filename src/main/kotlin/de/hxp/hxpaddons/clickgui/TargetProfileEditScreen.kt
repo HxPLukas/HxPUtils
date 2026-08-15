@@ -48,14 +48,17 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
 
     private data class Field(val label: String, val placeholder: String, val input: TextInputHandler)
 
-    private val fieldValues = MutableList(5) { "" }
+    private val fieldValues = MutableList(8) { "" }
 
     private val fieldLabels = listOf(
         "Entity Type" to "e.g. Zombie",
         "Name" to "e.g. Crypt Ghoul",
         "Skin / Model ID" to "texture, CustomModelData or ItemModel id",
         "Item Held" to "e.g. Iron Sword",
-        "Armor" to "e.g. Leather Boots"
+        "Helmet" to "e.g. Leather Cap",
+        "Chestplate" to "e.g. Leather Tunic",
+        "Leggings" to "e.g. Leather Pants",
+        "Boots" to "e.g. Leather Boots"
     )
 
     private val fields: List<Field> = fieldLabels.mapIndexed { i, (label, placeholder) ->
@@ -200,7 +203,10 @@ object TargetProfileEditScreen : Screen(Component.literal("Add Target Profile"))
             name = fieldValues[1].trim(),
             skinId = fieldValues[2].trim(),
             heldItem = fieldValues[3].trim(),
-            armor = fieldValues[4].trim()
+            helmet = fieldValues[4].trim(),
+            chestplate = fieldValues[5].trim(),
+            leggings = fieldValues[6].trim(),
+            boots = fieldValues[7].trim()
         )
         if (!profile.isBlank) {
             CustomESP.targetProfiles.add(profile)
