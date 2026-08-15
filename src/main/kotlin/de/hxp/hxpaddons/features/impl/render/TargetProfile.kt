@@ -19,8 +19,10 @@ import net.minecraft.world.entity.LivingEntity
  * findet"). An entity matches [CustomESP]'s target-profile system as a whole if it satisfies ANY one profile
  * in the list ("oder" across profiles) - see [CustomESP.matchesAnyProfile].
  *
- * All five fields are matched the same way: case-insensitive substring, exactly like every other text match
- * in this module.
+ * All fields are matched the same way: case-insensitive substring, exactly like every other text match in
+ * this module. Armor started as one combined field matched against any of the 4 armor slots, split into one
+ * field per slot (2026-08-16, on request - "unterteile armor bitte in alle 4 pieces einzeln") so a profile can
+ * pin down e.g. specifically the boots instead of "any armor piece contains X".
  */
 data class TargetProfile(
     /** Matched against [Entity.getType]'s translated description, e.g. "Zombie". */
@@ -31,10 +33,17 @@ data class TargetProfile(
     var skinId: String = "",
     /** Matched against the [EquipmentSlot.MAINHAND] item's display name, e.g. "Iron Sword". */
     var heldItem: String = "",
-    /** Matched against any of [EquipmentSlot.HEAD]/[EquipmentSlot.CHEST]/[EquipmentSlot.LEGS]/[EquipmentSlot.FEET]'s item display name. */
-    var armor: String = ""
+    /** Matched against the [EquipmentSlot.HEAD] item's display name. */
+    var helmet: String = "",
+    /** Matched against the [EquipmentSlot.CHEST] item's display name. */
+    var chestplate: String = "",
+    /** Matched against the [EquipmentSlot.LEGS] item's display name. */
+    var leggings: String = "",
+    /** Matched against the [EquipmentSlot.FEET] item's display name. */
+    var boots: String = ""
 ) {
-    val isBlank: Boolean get() = entityType.isBlank() && name.isBlank() && skinId.isBlank() && heldItem.isBlank() && armor.isBlank()
+    val isBlank: Boolean get() = entityType.isBlank() && name.isBlank() && skinId.isBlank() && heldItem.isBlank() &&
+        helmet.isBlank() && chestplate.isBlank() && leggings.isBlank() && boots.isBlank()
 
     /** Short one-line description for the profile list row - only the fields actually filled in. */
     fun summary(): String {
@@ -43,7 +52,10 @@ data class TargetProfile(
             if (name.isNotBlank()) add("Name: $name")
             if (skinId.isNotBlank()) add("Skin: ${if (skinId.length > 16) skinId.take(16) + "..." else skinId}")
             if (heldItem.isNotBlank()) add("Held: $heldItem")
-            if (armor.isNotBlank()) add("Armor: $armor")
+            if (helmet.isNotBlank()) add("Helmet: $helmet")
+            if (chestplate.isNotBlank()) add("Chest: $chestplate")
+            if (leggings.isNotBlank()) add("Legs: $leggings")
+            if (boots.isNotBlank()) add("Boots: $boots")
         }
         return if (parts.isEmpty()) "(empty profile)" else parts.joinToString(" | ")
     }
@@ -60,18 +72,16 @@ data class TargetProfile(
             }
             if (!hasSignal) return false
         }
-        if (heldItem.isNotBlank()) {
-            val held = living?.getItemBySlot(EquipmentSlot.MAINHAND)
-            if (held == null || held.isEmpty || !held.hoverName.string.noControlCodes.contains(heldItem, ignoreCase = true)) return false
-        }
-        if (armor.isNotBlank()) {
-            val armorSlots = listOf(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)
-            val hasArmorMatch = living != null && armorSlots.any { slot ->
-                val stack = living.getItemBySlot(slot)
-                !stack.isEmpty && stack.hoverName.string.noControlCodes.contains(armor, ignoreCase = true)
-            }
-            if (!hasArmorMatch) return false
-        }
+        if (heldItem.isNotBlank() && !slotMatches(living, EquipmentSlot.MAINHAND, heldItem)) return false
+        if (helmet.isNotBlank() && !slotMatches(living, EquipmentSlot.HEAD, helmet)) return false
+        if (chestplate.isNotBlank() && !slotMatches(living, EquipmentSlot.CHEST, chestplate)) return false
+        if (leggings.isNotBlank() && !slotMatches(living, EquipmentSlot.LEGS, leggings)) return false
+        if (boots.isNotBlank() && !slotMatches(living, EquipmentSlot.FEET, boots)) return false
         return true
+    }
+
+    private fun slotMatches(living: LivingEntity?, slot: EquipmentSlot, query: String): Boolean {
+        val stack = living?.getItemBySlot(slot) ?: return false
+        return !stack.isEmpty && stack.hoverName.string.noControlCodes.contains(query, ignoreCase = true)
     }
 }
