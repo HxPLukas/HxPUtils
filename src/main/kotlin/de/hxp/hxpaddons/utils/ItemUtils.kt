@@ -7,6 +7,7 @@ import com.mojang.authlib.properties.PropertyMap
 import de.hxp.hxpaddons.HxPMod.mc
 import de.hxp.hxpaddons.utils.network.hypixelapi.HypixelData
 import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.network.chat.Component
 import net.minecraft.world.entity.EquipmentSlot
@@ -55,11 +56,19 @@ val ItemStack.texture: String?
 /**
  * Every readable "custom disguise" signal a single item carries - its skull skin [texture] value, each
  * non-blank [net.minecraft.world.item.component.CustomModelData] string, and its
- * [DataComponents.ITEM_MODEL] identifier if set. Shared by
+ * [DataComponents.ITEM_MODEL] identifier if set AND different from the item's own default (e.g. a plain Iron
+ * Pickaxe's [DataComponents.ITEM_MODEL] is present but just reads `minecraft:iron_pickaxe` - its own vanilla
+ * id, not a disguise; only a value that differs from that default is an actual resource-pack remap). Shared by
  * [de.hxp.hxpaddons.features.impl.render.CustomESP]'s Custom Texture match mode and
  * [de.hxp.hxpaddons.features.impl.skyblock.OdonataESP]'s Head Texture detection mode - both need to identify
  * whichever mechanism Hypixel actually used to disguise something (a skull skin, or a resource-pack-remapped
  * model via CustomModelData/ItemModel), without needing to already know which one in advance.
+ *
+ * Bugfix (2026-08-16, on request - "Skin/Model ID: minecraft:iron_pickaxe das kommt nicht hin oder?"): every
+ * item carries an [DataComponents.ITEM_MODEL] component by default (it's how the client knows what to render
+ * at all), so comparing it for presence alone flagged EVERY item as "disguised" via its own plain id -
+ * `/hxp esp mob`'s Skin/Model ID field surfaced this for a completely undisguised Iron Pickaxe. Now only
+ * counted as a signal when it doesn't match [BuiltInRegistries.ITEM]'s own key for the item.
  */
 val ItemStack.disguiseSignals: List<String>
     get() {
@@ -67,7 +76,9 @@ val ItemStack.disguiseSignals: List<String>
         val signals = mutableListOf<String>()
         texture?.let { signals.add(it) }
         get(DataComponents.CUSTOM_MODEL_DATA)?.strings()?.forEach { if (it.isNotBlank()) signals.add(it) }
-        get(DataComponents.ITEM_MODEL)?.let { signals.add(it.toString()) }
+        get(DataComponents.ITEM_MODEL)?.let { modelId ->
+            if (modelId != BuiltInRegistries.ITEM.getKey(item)) signals.add(modelId.toString())
+        }
         return signals
     }
 
