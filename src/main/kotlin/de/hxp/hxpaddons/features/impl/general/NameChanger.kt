@@ -1,7 +1,6 @@
 package de.hxp.hxpaddons.features.impl.general
 
 import de.hxp.hxpaddons.HxPMod.mc
-import de.hxp.hxpaddons.clickgui.settings.WipModule
 import de.hxp.hxpaddons.clickgui.settings.impl.ColorSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.StringSetting
 import de.hxp.hxpaddons.features.Category
@@ -46,11 +45,10 @@ import net.minecraft.network.chat.contents.PlainTextContents
  * characters immediately before/after the match must not themselves be name characters (letter/digit/`_`,
  * the only characters Minecraft usernames can contain).
  *
- * WIP: the scoreboard sidebar also shows text but isn't touched yet - Hypixel draws it via team
+ * Not covered: the scoreboard sidebar also shows text but isn't touched - Hypixel draws it via team
  * prefix/suffix wrapped around blank score-holder names (see [de.hxp.hxpaddons.utils.readPurseBalance]'s own
  * doc) rather than your literal username, so it's unlikely to ever need a name here anyway.
  */
-@WipModule
 object NameChanger : Module(
     name = "Name Changer",
     description = "Replaces your own name with another one (in a configurable color) wherever it shows up in chat and the tab list.",
