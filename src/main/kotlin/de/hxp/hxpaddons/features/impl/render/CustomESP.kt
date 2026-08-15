@@ -239,8 +239,10 @@ object CustomESP : Module(
             // convention the old empty-Entity-Names search used to have (see [[project_custom_esp]]), now
             // driven entirely by Target Profiles (2026-08-16, on request - "es soll nurnoch über das neue
             // laufen", removing the older single Entity Names/Ignore Entity Names text-list matching entirely
-            // now that profiles cover everything that could).
-            debugModeActive = targetProfiles.isEmpty()
+            // now that profiles cover everything that could). A list that's non-empty but every profile in it
+            // toggled off (see TargetProfile.enabled) counts the same as empty - none of them can match
+            // anything right now either way.
+            debugModeActive = targetProfiles.none { it.enabled }
             val maxDistSq = currentScanDistance() * currentScanDistance()
 
             entities.clear()
