@@ -385,38 +385,19 @@ object CustomESP : Module(
      * The text drawn above an entity in debug mode (see [debugShowNames]) - identical to [labelFor] except in
      * [MATCH_MODE_TEXTURE], where the real value can be long and is impossible to copy back out of the game
      * world at all. Instead, each distinct combined value seen gets a short sequential id ("Texture #1",
-     * "Texture #2", ...) - both drawn in-world (readable from a distance) and printed once to chat, together
-     * with the entity's own type/name (2026-08-16, on request, so a texture can be tied back to a specific
-     * entity/mob afterward rather than only ever "whatever was highlighted at the time") and a full per-slot
-     * breakdown (item id + every raw signal found in that slot) the first time it's seen (copyable from there)
-     * via [discoveredTextures] - so the workflow is: turn on debug mode with Custom
-     * Texture selected, look at whatever should be highlighted, read the matching "Texture #N" off its
-     * floating label, then find that same id in chat for the exact per-slot details to match on. If an entity
-     * has equipped items but none carry any recognized signal, the per-slot item ids are still dumped (rather
-     * than just "nothing found") so it's visible *what's equipped* even when this function doesn't yet know
-     * how to read its disguise mechanism.
+     * "Texture #2", ...) via [discoveredTextures], purely as an in-world label - no longer also printed to
+     * chat (2026-08-16, on request, after the investigation this was built for wrapped up - "er spammt mir
+     * immernoch mein chat voll er muss jetzt nichts mehr loggen"). For the actual full details behind a given
+     * entity now, use `/hxp esp dump` (look at it directly) instead.
      */
     private fun debugLabelFor(entity: Entity): String {
         if (matchMode != MATCH_MODE_TEXTURE) return labelFor(entity)
         val living = entity as? LivingEntity ?: return "(not a living entity)"
-        val equipped = EquipmentSlot.entries.mapNotNull { slot ->
-            val stack = living.getItemBySlot(slot)
-            if (stack.isEmpty) null else slot to stack
-        }
-        if (equipped.isEmpty()) return "(no equipped items)"
+        val hasEquipment = EquipmentSlot.entries.any { !living.getItemBySlot(it).isEmpty }
+        if (!hasEquipment) return "(no equipped items)"
 
         val combined = labelFor(entity)
-        val index = discoveredTextures.getOrPut(combined) {
-            val next = discoveredTextures.size + 1
-            val entityInfo = "${BuiltInRegistries.ENTITY_TYPE.getKey(entity.type)} name=\"${entity.name.string.noControlCodes}\""
-            val details = equipped.joinToString(" | ") { (slot, stack) ->
-                val itemId = BuiltInRegistries.ITEM.getKey(stack.item)
-                val signals = stack.disguiseSignals
-                "$slot=$itemId" + if (signals.isNotEmpty()) " [${signals.joinToString(", ")}]" else " [no signal]"
-            }
-            modMessage("§bCustom ESP debug: Texture #$next ($entityInfo) -> $details")
-            next
-        }
+        val index = discoveredTextures.getOrPut(combined) { discoveredTextures.size + 1 }
         return "Texture #$index"
     }
 
