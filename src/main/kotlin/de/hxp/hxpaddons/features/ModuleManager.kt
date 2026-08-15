@@ -36,6 +36,7 @@ import de.hxp.hxpaddons.features.impl.general.ChatFilter
 import de.hxp.hxpaddons.features.impl.general.CompactChat
 import de.hxp.hxpaddons.features.impl.general.CopyChat
 import de.hxp.hxpaddons.features.impl.general.ModIdHider
+import de.hxp.hxpaddons.features.impl.general.NameChanger
 import de.hxp.hxpaddons.features.impl.general.SmoothWorldLoading
 import de.hxp.hxpaddons.features.impl.render.BorderlessFullscreen
 import de.hxp.hxpaddons.features.impl.render.ClickGUIModule
@@ -94,6 +95,7 @@ object ModuleManager {
             CompactChat,
             CopyChat,
             ModIdHider,
+            NameChanger,
             SmoothWorldLoading,
             GreenhouseTimer,
             PhantomLeafSolver,
