@@ -43,6 +43,7 @@ import de.hxp.hxpaddons.features.impl.mining.GoldenDragonFinder
 import de.hxp.hxpaddons.features.impl.render.BorderlessFullscreen
 import de.hxp.hxpaddons.features.impl.render.ClickGUIModule
 import de.hxp.hxpaddons.features.impl.render.CustomESP
+import de.hxp.hxpaddons.features.impl.render.Zoom
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.fabricmc.loader.api.FabricLoader
@@ -114,6 +115,7 @@ object ModuleManager {
             PuzzleTriggerbot,
             StarMobESP,
             CustomESP,
+            Zoom,
             CrystalHollowsStructureFinder,
             GoldenDragonFinder,
             CrystalHollowsMap

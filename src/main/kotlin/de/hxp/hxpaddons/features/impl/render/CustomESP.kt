@@ -180,6 +180,8 @@ object CustomESP : Module(
     private const val MAX_SCAN_DISTANCE = 100_000.0
 
     private val entities = mutableSetOf<Entity>()
+    /** ArmorStands matched via a Name Tag search (see the redirect logic below) - highlighted regardless of [ignoreArmorStandVisual], since these are the actual nametag holder, not a decorative ArmorStand that setting is meant to filter out. Rebuilt every tick alongside [entities]. */
+    private val forceVisibleArmorStands = mutableSetOf<Entity>()
     private var debugModeActive = false
 
     /** One matched particle's world position, registry name (for the debug-mode label) and when its highlight should disappear - see [particleESP]'s own doc. */
@@ -204,6 +206,7 @@ object CustomESP : Module(
             val maxDistSq = currentScanDistance() * currentScanDistance()
 
             entities.clear()
+            forceVisibleArmorStands.clear()
             mc.level?.entitiesForRendering()?.forEach { e ->
                 if (e === player || !e.isAlive) return@forEach
                 if (player.distanceToSqr(e) > maxDistSq) return@forEach
@@ -223,9 +226,13 @@ object CustomESP : Module(
                     // match look like it never fired at all - on request, after exactly that symptom got
                     // reported ("er markiert mir garnichts mehr ... sobald ich irgendwas eingebe"). Also
                     // registers the real mob standing directly beneath the matched ArmorStand so IT gets
-                    // the box/outline; the ArmorStand itself stays in the set too, purely so its name still
-                    // shows correctly in the debug-mode label instead of the mob's own generic name.
+                    // the box/outline. The ArmorStand itself is force-visible too (on request, "er soll den
+                    // armorstand und mob highlighten fürs erste") via [forceVisibleArmorStands], bypassing
+                    // [ignoreArmorStandVisual] entirely for this specific match - that setting is about
+                    // filtering out decorative ArmorStands from debug/highlight-everything mode, not this
+                    // explicit name match.
                     if (matchMode != MATCH_MODE_TYPE && e is ArmorStand) {
+                        forceVisibleArmorStands.add(e)
                         mc.level?.getEntities(e, e.boundingBox.move(0.0, -1.0, 0.0)) { it !is ArmorStand && it.isAlive }
                             ?.firstOrNull()?.let { entities.add(it) }
                     }
@@ -271,7 +278,7 @@ object CustomESP : Module(
                 if (!entity.isAlive) return@forEach
                 val isArmorStand = entity is ArmorStand
 
-                if (!(isArmorStand && ignoreArmorStandVisual)) {
+                if (!(isArmorStand && ignoreArmorStandVisual) || entity in forceVisibleArmorStands) {
                     if (espType == ESP_TYPE_OUTLINE) EntityOutlineESP.set(entity, espColor.multiplyAlpha(outlineOpacity / 100f).rgba)
                     else drawEntityBox(entity.renderBoundingBox)
                 }
