@@ -84,11 +84,11 @@ object Zoom : Module(
         desc = "Eases FOV in/out at a constant (linear) rate instead of an instant snap, and smooths camera turning (with a brief coast when you stop moving the mouse) while zoomed, via Minecraft's own Smooth Camera option."
     )
     private val smoothZoomInDurationMs by NumberSetting(
-        "Smooth Zoom In Duration", 300.0, 50.0, 3000.0, 25.0, unit = "ms",
+        "Smooth Zoom In Duration", 120.0, 50.0, 3000.0, 25.0, unit = "ms",
         desc = "How long the ease takes when zooming in or adjusting the zoom level via scroll while held."
     ).withDependency { smoothMode }
     private val smoothZoomOutDurationMs by NumberSetting(
-        "Smooth Zoom Out Duration", 600.0, 50.0, 3000.0, 25.0, unit = "ms",
+        "Smooth Zoom Out Duration", 200.0, 50.0, 3000.0, 25.0, unit = "ms",
         desc = "How long the ease takes when releasing the key and zooming back out - kept separate from zoom-in duration since the same speed can feel too fast on the way out."
     ).withDependency { smoothMode }
 
