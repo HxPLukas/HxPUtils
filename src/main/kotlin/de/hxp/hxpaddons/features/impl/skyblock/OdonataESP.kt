@@ -52,9 +52,6 @@ object OdonataESP : Module(
 ) {
     private val espColor by ColorSetting("Odonata Color", Colors.MINECRAFT_LIGHT_PURPLE, true, desc = "The color a matched Odonata is highlighted in.")
 
-    /** Small upward nudge for the highlight box (see the render pass below) - on request, "minimal höher setzen". */
-    private const val HEAD_TEXTURE_BOX_Y_OFFSET = 0.15
-
     /** Odonata's confirmed disguise signal - a player-head skin texture value, held in its ArmorStand's MAINHAND slot (not HEAD) - captured live 2026-08-16 via Custom ESP's own Custom Texture debug dump. */
     private const val ODONATA_TEXTURE = "ewogICJ0aW1lc3RhbXAiIDogMTYyNTUxMjE4ODY3NCwKICAicHJvZmlsZUlkIiA6ICI3MzgyZGRmYmU0ODU0NTVjODI1ZjkwMGY4OGZkMzJmOCIsCiAgInByb2ZpbGVOYW1lIiA6ICJJb3lhbCIsCiAgInNpZ25hdHVyZVJlcXVpcmVkIiA6IHRydWUsCiAgInRleHR1cmVzIiA6IHsKICAgICJTS0lOIiA6IHsKICAgICAgInVybCIgOiAiaHR0cDovL3RleHR1cmVzLm1pbmVjcmFmdC5uZXQvdGV4dHVyZS85ZmQ4MDZkZWZkZmRmNTliMWYyNjA5YzhlZTM2NDY2NmRlNjYxMjdhNjIzNDE1YjU0MzBjOTM1OGM2MDFlZjdjIgogICAgfQogIH0KfQ=="
 
@@ -86,12 +83,14 @@ object OdonataESP : Module(
             trackedEntities.forEach { entity ->
                 if (!entity.isAlive) return@forEach
                 val full = entity.renderBoundingBox
-                // Odonata's ArmorStand has a full-height vanilla hitbox, but the actual visible model sits
-                // low in it - quartering the height and nudging the bottom up slightly (on request, "die box
-                // vierteln von der höhe und minimal höher setzen") hugs that low visible part instead of
-                // boxing the whole (mostly empty) ArmorStand hitbox.
-                val minY = full.minY + HEAD_TEXTURE_BOX_Y_OFFSET
-                val maxY = minY + (full.maxY - full.minY) / 4.0
+                // The visible model actually sits above the ArmorStand's own vanilla hitbox entirely, not
+                // low inside it as first assumed - confirmed live 2026-08-16 after the first (bottom-anchored)
+                // version was checked in-game ("mach die box so das die neue unterseite sozusagen die alte
+                // oberseite von als das noch hoch war ist"): the new box's bottom is the old full box's TOP,
+                // extending upward from there by the same quarter-height size as before.
+                val quarterHeight = (full.maxY - full.minY) / 4.0
+                val minY = full.maxY
+                val maxY = minY + quarterHeight
                 val aabb = AABB(full.minX, minY, full.minZ, full.maxX, maxY, full.maxZ)
                 drawFilledBox(aabb, espColor.multiplyAlpha(0.35f), depth = false)
                 drawWireFrameBox(aabb, espColor, thickness = 3f, depth = false)
