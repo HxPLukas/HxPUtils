@@ -16,6 +16,7 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 ### 🌿 Garden
 - **Greenhouse Timer** — shows a timer for greenhouse growth stages and tracks time away from the Garden.
 - **Phantom Leaf Solver** — triangulates the exact Phantom Leaf position in the Garden.
+- **Pest ESP** — highlights garden pests through walls.
 
 ### 🏝️ Skyblock
 - **Auto Fish** — reels in and recasts automatically when a fish bites.
