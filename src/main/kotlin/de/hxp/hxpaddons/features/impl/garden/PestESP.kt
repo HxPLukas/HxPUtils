@@ -4,7 +4,6 @@ import de.hxp.hxpaddons.clickgui.settings.Setting.Companion.withDependency
 import de.hxp.hxpaddons.clickgui.settings.impl.ColorSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.NumberSetting
 import de.hxp.hxpaddons.clickgui.settings.impl.SelectorSetting
-import de.hxp.hxpaddons.clickgui.settings.impl.StringSetting
 import de.hxp.hxpaddons.events.RenderEvent
 import de.hxp.hxpaddons.events.TickEvent
 import de.hxp.hxpaddons.events.WorldEvent
@@ -39,31 +38,28 @@ object PestESP : Module(
     private val outlineOpacity by NumberSetting("Outline Opacity", 100, 0, 100, 1, unit = "%", desc = "Opacity of the glowing outline.").withDependency { espType == ESP_TYPE_OUTLINE }
     private val boxOutlineWidth by NumberSetting("Box Outline Width", 3, 0, 10, 1, desc = "Width of the box's outline.").withDependency { espType == ESP_TYPE_BOX }
     private val boxOpacity by NumberSetting("Box Opacity", 50, 0, 100, 1, unit = "%", desc = "Opacity of the box's fill.").withDependency { espType == ESP_TYPE_BOX }
-    private val boxWidthScale by NumberSetting("Box Width Scale", 100, 100, 500, 5, unit = "%", desc = "Stretches the box wider than the actual Silverfish hitbox - grows evenly from the center (the pest's own model is usually bigger than its tiny hitbox).").withDependency { espType == ESP_TYPE_BOX }
-    private val boxHeightScale by NumberSetting("Box Height Scale", 100, 100, 500, 5, unit = "%", desc = "Stretches the box taller than the actual Silverfish hitbox - always grows up from the bottom (its feet stay planted on the ground, since the pest's model sits on top of the hitbox, not centered on it), the extra height is added on top only.").withDependency { espType == ESP_TYPE_BOX }
-    private val boxDepthScale by NumberSetting("Box Depth Scale", 100, 100, 500, 5, unit = "%", desc = "Stretches the box deeper (Z axis) than the actual Silverfish hitbox - grows evenly from the center, same as Box Width Scale.").withDependency { espType == ESP_TYPE_BOX }
     private val pestColor by ColorSetting("Pest Color", Colors.MINECRAFT_GREEN, true, desc = "The color pests are highlighted in.")
-    private val scanDistanceInput by StringSetting("Scan Distance", "64", length = 10, desc = "Maximum distance (in blocks) a pest can be from you to get matched/highlighted - type any number, no fixed upper limit.")
 
     // Indices into the "ESP Type" SelectorSetting's option list above.
     private const val ESP_TYPE_OUTLINE = 0
     private const val ESP_TYPE_BOX = 1
 
-    /** [scanDistanceInput]'s fallback if the typed text doesn't parse as a number at all. */
-    private const val DEFAULT_SCAN_DISTANCE = 64.0
+    // Fixed box scale (on request, no longer user-adjustable) - the actual pest model is bigger than its
+    // tiny Silverfish hitbox, these values just eyeballed to roughly cover it.
+    private const val BOX_WIDTH_SCALE = 1.70
+    private const val BOX_HEIGHT_SCALE = 2.00
+    private const val BOX_DEPTH_SCALE = 1.55
 
-    /** [scanDistanceInput]'s sanity ceiling - not a real functional limit, just a guard against a typo like an extra zero. */
-    private const val MAX_SCAN_DISTANCE = 100_000.0
+    // Fixed scan distance (on request, no longer user-adjustable).
+    private const val SCAN_DISTANCE = 200.0
 
     private val entities = mutableSetOf<Entity>()
-
-    private fun currentScanDistance(): Double = scanDistanceInput.trim().toDoubleOrNull()?.coerceIn(1.0, MAX_SCAN_DISTANCE) ?: DEFAULT_SCAN_DISTANCE
 
     init {
         on<TickEvent.End> {
             if (!enabled || !LocationUtils.isCurrentArea(Island.Garden)) return@on
             val player = mc.player ?: return@on
-            val maxDistSq = currentScanDistance() * currentScanDistance()
+            val maxDistSq = SCAN_DISTANCE * SCAN_DISTANCE
 
             entities.clear()
             mc.level?.entitiesForRendering()?.forEach { e ->
@@ -97,19 +93,17 @@ object PestESP : Module(
     }
 
     /**
-     * [boxWidthScale]/[boxHeightScale]/[boxDepthScale] applied to [aabb] independently - width/depth (X/Z)
-     * grow evenly from the box's own center, height (Y) always grows up from minY only (the Silverfish's
-     * feet stay planted on the ground, matching how the actual pest model sits on top of its hitbox rather
-     * than being centered on it).
+     * [BOX_WIDTH_SCALE]/[BOX_HEIGHT_SCALE]/[BOX_DEPTH_SCALE] applied to [aabb] - width/depth (X/Z) grow
+     * evenly from the box's own center, height (Y) always grows up from minY only (the Silverfish's feet
+     * stay planted on the ground, matching how the actual pest model sits on top of its hitbox rather than
+     * being centered on it).
      */
     private fun scaledBox(aabb: AABB): AABB {
-        if (boxWidthScale == 100 && boxHeightScale == 100 && boxDepthScale == 100) return aabb
-
         val centerX = (aabb.minX + aabb.maxX) / 2.0
         val centerZ = (aabb.minZ + aabb.maxZ) / 2.0
-        val halfWidth = (aabb.maxX - aabb.minX) / 2.0 * (boxWidthScale / 100.0)
-        val halfDepth = (aabb.maxZ - aabb.minZ) / 2.0 * (boxDepthScale / 100.0)
-        val newHeight = (aabb.maxY - aabb.minY) * (boxHeightScale / 100.0)
+        val halfWidth = (aabb.maxX - aabb.minX) / 2.0 * BOX_WIDTH_SCALE
+        val halfDepth = (aabb.maxZ - aabb.minZ) / 2.0 * BOX_DEPTH_SCALE
+        val newHeight = (aabb.maxY - aabb.minY) * BOX_HEIGHT_SCALE
 
         return AABB(
             centerX - halfWidth, aabb.minY, centerZ - halfDepth,
