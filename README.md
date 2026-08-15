@@ -13,6 +13,8 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 
 ## Features
 
+*(WIP)* modules are hidden from the Click GUI by default (unverified live behavior) — reveal them with `/hxp wip`.
+
 ### 🌿 Garden
 - **Greenhouse Timer** — shows a timer for greenhouse growth stages and tracks time away from the Garden.
 - **Pest ESP** — highlights garden pests through walls.
@@ -21,7 +23,7 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 ### 🏝️ Skyblock
 - **Auto Fish** — reels in and recasts automatically when a fish bites.
 - **Combat** — after reeling in, swaps to a combat slot, right-clicks, then swaps back to the rod.
-- **No Rotate** — prevents the server from snapping your view when using teleport items.
+- **No Rotate** *(WIP)* — prevents the server from snapping your view when using teleport items.
 - **Term AC** — automatically left-click spams while holding right click with a Terminator bow.
 - **Terminator** — detects the ultimate enchantment on a Terminator bow.
 - **Wardrobe Keybinds** — equips a wardrobe slot from anywhere, opening/closing the wardrobe as needed.
@@ -32,8 +34,8 @@ Same feature set as HxPAddons, minus Bazaar Flipper, Fuser (shard fusion), Golde
 - **Puzzle Triggerbot** — solves supported puzzles and clicks the correct answer as soon as you hover it.
 - **Secret Triggerbot** — automatically interacts with secrets (chests, levers, wither essence) as soon as you look at them.
 - **Star Mob ESP** — highlights starred dungeon mobs through walls.
-- **Terminal Solver** — renders the solution for floor 7 terminals.
-- **Terminal Triggerbot** — middle-clicks a terminal slot as soon as it's known to be correct.
+- **Terminal Solver** *(WIP)* — renders the solution for floor 7 terminals.
+- **Terminal Triggerbot** *(WIP)* — middle-clicks a terminal slot as soon as it's known to be correct.
 
 ### 🎨 Render
 - **Custom ESP** — highlights entities (and optionally particles) matching a name/type list through walls.
