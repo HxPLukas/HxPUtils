@@ -53,9 +53,7 @@ jobs:
           PAYLOAD=$(jq -n \
             --arg title "HxPUtils $TAG released" \
             --arg url "https://github.com/${{ github.repository }}/releases/tag/$TAG" \
-            --arg desc "New HxPUtils build available: **$JAR_NAME**
-
-Added: Pest ESP, Auto Loadout, Name Changer" \
+            --arg desc "New HxPUtils build available: **$JAR_NAME**" \
             '{embeds: [{title: $title, url: $url, description: $desc, color: 3447003}]}')
           curl -sS -X POST "$DISCORD_WEBHOOK_URL" \
             -F "payload_json=$PAYLOAD" \
