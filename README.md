@@ -47,5 +47,6 @@ A Hypixel Skyblock QoL Fabric mod, based on Odin by odtheking (see [`LICENSE`](L
 - `/hxp craftflip` — scans the Bazaar for profitable craft flips.
 - `/hxp fish [stop]` — toggles Auto Fish.
 - `/hxp loadout <n>` — equips loadout n via /loadout.
+- `/hxp fuse run <shard 1> [qty] <shard 2> [qty] <result>` — runs a fuse via the Fusion NPC (qty defaults to 5 if omitted).
 - `/hxp garden reset` — resets the Phantom Leaf Solver.
 - `/hxp wip` — toggles WIP modules in the Click GUI.

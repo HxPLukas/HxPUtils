@@ -9,6 +9,7 @@ import de.hxp.hxpaddons.features.ModuleManager
 import de.hxp.hxpaddons.features.impl.garden.PhantomLeafSolver
 import de.hxp.hxpaddons.features.impl.skyblock.AutoFish
 import de.hxp.hxpaddons.features.impl.skyblock.AutoLoadout
+import de.hxp.hxpaddons.features.impl.skyblock.Fuser
 import de.hxp.hxpaddons.features.impl.render.CustomESP
 import de.hxp.hxpaddons.utils.handlers.schedule
 import de.hxp.hxpaddons.utils.modMessage
@@ -63,6 +64,12 @@ val mainCommand = Commodore("hxpaddons", "hxp") {
         runs { n: Int -> AutoLoadout.equip(n) }
     }
 
+    literal("fuse") {
+        literal("run") {
+            runs { args: GreedyString -> Fuser.start(args.string) }
+        }
+    }
+
     literal("esp") {
         literal("dump") {
             runs { CustomESP.dumpLookedAtEntity() }
@@ -96,6 +103,7 @@ private fun printHelp() {
     modMessage("§f/hxp fish [stop] §7- toggles Auto Fish.")
     modMessage("§f/hxp garden reset §7- resets the Phantom Leaf Solver.")
     modMessage("§f/hxp loadout <n> §7- equips loadout n via /loadout.")
+    modMessage("§f/hxp fuse run <shard 1> [qty] <shard 2> [qty] <result> §7- runs a fuse via the Fusion NPC (qty defaults to 5 if omitted).")
     modMessage("§f/hxp esp dump §7- dumps every readable field for whatever entity you're looking at.")
     modMessage("§f/hxp esp mob §7- dumps the closest ESP'd entity's data in Target Profile field order (Entity Type, Name, Skin ID, Item Held, Helmet, Chestplate, Leggings, Boots).")
     modMessage("§f/hxp wip §7- toggles WIP modules in the Click GUI.")
